@@ -1,4 +1,4 @@
-package net.revilodev.boundless;
+package net.revilodev.codex;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.resources.ResourceLocation;
@@ -21,24 +21,24 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartingEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.revilodev.boundless.client.ClientQuestEvents;
-import net.revilodev.boundless.client.QuestPanelClient;
-import net.revilodev.boundless.command.BoundlessCommands;
-import net.revilodev.boundless.item.ModItems;
-import net.revilodev.boundless.network.BoundlessNetwork;
-import net.revilodev.boundless.quest.KillCounterState;
-import net.revilodev.boundless.quest.QuestData;
-import net.revilodev.boundless.quest.QuestEvents;
+import net.revilodev.codex.client.ClientQuestEvents;
+import net.revilodev.codex.client.QuestPanelClient;
+import net.revilodev.codex.command.BoundlessCommands;
+import net.revilodev.codex.item.ModItems;
+import net.revilodev.codex.network.CodexNetwork;
+import net.revilodev.codex.quest.KillCounterState;
+import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.quest.QuestEvents;
 import org.slf4j.Logger;
 
 import java.util.List;
 
-@Mod(BoundlessMod.MOD_ID)
-public final class BoundlessMod {
-    public static final String MOD_ID = "boundless";
+@Mod(CodexMod.MOD_ID)
+public final class CodexMod {
+    public static final String MOD_ID = "codex";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public BoundlessMod(ModContainer modContainer, IEventBus modBus) {
+    public CodexMod(ModContainer modContainer, IEventBus modBus) {
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC, MOD_ID + "-common.toml");
         ModItems.register(modBus);
         modBus.addListener(this::commonSetup);
@@ -46,13 +46,13 @@ public final class BoundlessMod {
         if (net.neoforged.fml.loading.FMLEnvironment.dist == Dist.CLIENT) {
             modBus.addListener(this::clientSetup);
         }
-        BoundlessNetwork.bootstrap(modBus);
+        CodexNetwork.bootstrap(modBus);
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.addListener(QuestEvents::onPlayerTick);
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
-        LOGGER.info("Boundless common setup complete");
+        LOGGER.info("Codex common setup complete");
     }
 
     private void clientSetup(final FMLClientSetupEvent event) {
@@ -67,7 +67,7 @@ public final class BoundlessMod {
 
     private void addCreative(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(ModItems.QUEST_BOOK.get());
+            event.accept(ModItems.GUID_BOOK.get());
         }
     }
 
@@ -78,14 +78,14 @@ public final class BoundlessMod {
 
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
-        LOGGER.info("Boundless server starting");
+        LOGGER.info("Codex server starting");
         QuestData.loadServer(event.getServer(), true);
     }
 
     @SubscribeEvent
     public void onPlayerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
         if (event.getEntity() instanceof ServerPlayer sp) {
-            BoundlessNetwork.syncPlayer(sp);
+            CodexNetwork.syncPlayer(sp);
         }
     }
 
@@ -98,8 +98,8 @@ public final class BoundlessMod {
         if (rl == null) return;
         KillCounterState.get(server).inc(sp.getUUID(), rl.toString());
         int count = KillCounterState.get(server).get(sp.getUUID(), rl.toString());
-        BoundlessNetwork.KillEntry entry = new BoundlessNetwork.KillEntry(rl.toString(), count);
-        BoundlessNetwork.SyncKills payload = new BoundlessNetwork.SyncKills(List.of(entry));
+        CodexNetwork.KillEntry entry = new CodexNetwork.KillEntry(rl.toString(), count);
+        CodexNetwork.SyncKills payload = new CodexNetwork.SyncKills(List.of(entry));
         PacketDistributor.sendToPlayer(sp, payload);
     }
 }

@@ -1,4 +1,4 @@
-package net.revilodev.boundless.command;
+package net.revilodev.codex.command;
 
 import com.mojang.brigadier.CommandDispatcher;
 import net.minecraft.commands.CommandSourceStack;
@@ -7,9 +7,9 @@ import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.revilodev.boundless.network.BoundlessNetwork;
-import net.revilodev.boundless.quest.QuestData;
-import net.revilodev.boundless.quest.QuestTracker;
+import net.revilodev.codex.network.CodexNetwork;
+import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.quest.QuestTracker;
 
 public final class BoundlessCommands {
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
@@ -21,7 +21,7 @@ public final class BoundlessCommands {
                                     MinecraftServer server = ctx.getSource().getServer();
                                     QuestData.loadServer(server, true);
                                     for (ServerPlayer p : server.getPlayerList().getPlayers()) {
-                                        BoundlessNetwork.syncPlayer(p);
+                                        CodexNetwork.syncPlayer(p);
                                     }
                                     ctx.getSource().sendSuccess(() -> Component.literal("Boundless quests reloaded."), true);
                                     return 1;
@@ -44,7 +44,7 @@ public final class BoundlessCommands {
                                             QuestData.byIdServer(player.server, id).ifPresent(q -> {
                                                 if (QuestTracker.isReady(q, player)) {
                                                     if (QuestTracker.serverRedeem(q, player)) {
-                                                        BoundlessNetwork.sendStatus(player, q.id, QuestTracker.Status.REDEEMED.name());
+                                                        CodexNetwork.sendStatus(player, q.id, QuestTracker.Status.REDEEMED.name());
                                                         ctx.getSource().sendSuccess(() -> Component.literal("Redeemed quest " + q.id), false);
                                                     }
                                                 } else {
@@ -59,7 +59,7 @@ public final class BoundlessCommands {
                                             ServerPlayer player = ctx.getSource().getPlayer();
                                             if (player == null) return 0;
                                             String id = ResourceLocationArgument.getId(ctx, "id").toString();
-                                            BoundlessNetwork.sendToast(player, id);
+                                            CodexNetwork.sendToast(player, id);
                                             ctx.getSource().sendSuccess(() -> Component.literal("Toast sent for " + id), false);
                                             return 1;
                                         })))

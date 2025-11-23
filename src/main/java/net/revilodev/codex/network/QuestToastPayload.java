@@ -1,13 +1,13 @@
-package net.revilodev.boundless.network;
+package net.revilodev.codex.network;
 
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceLocation;
-import net.revilodev.boundless.BoundlessMod;
+import net.revilodev.codex.CodexMod;
 
 public record QuestToastPayload(String questId) {
     public static final ResourceLocation ID =
-            ResourceLocation.fromNamespaceAndPath(BoundlessMod.MOD_ID, "quest_toast");
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "quest_toast");
 
     public static final StreamCodec<FriendlyByteBuf, QuestToastPayload> CODEC =
             StreamCodec.of(

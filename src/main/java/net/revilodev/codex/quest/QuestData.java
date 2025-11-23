@@ -1,4 +1,4 @@
-package net.revilodev.boundless.quest;
+package net.revilodev.codex.quest;
 
 import com.google.gson.*;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -11,7 +11,7 @@ import net.minecraft.util.GsonHelper;
 import net.minecraft.world.item.Item;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.revilodev.boundless.Config;
+import net.revilodev.codex.Config;
 
 import java.io.BufferedReader;
 import java.io.IOException;

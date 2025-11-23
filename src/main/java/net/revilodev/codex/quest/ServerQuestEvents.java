@@ -1,4 +1,4 @@
-package net.revilodev.boundless.quest;
+package net.revilodev.codex.quest;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;

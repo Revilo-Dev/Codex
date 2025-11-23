@@ -1,4 +1,4 @@
-package net.revilodev.boundless.client;
+package net.revilodev.codex.client;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -9,8 +9,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.revilodev.boundless.Config;
-import net.revilodev.boundless.quest.QuestData;
+import net.revilodev.codex.Config;
+import net.revilodev.codex.quest.QuestData;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,4 +1,4 @@
-package net.revilodev.boundless.quest;
+package net.revilodev.codex.quest;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -19,8 +19,8 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.revilodev.boundless.Config;
-import net.revilodev.boundless.network.BoundlessNetwork;
+import net.revilodev.codex.Config;
+import net.revilodev.codex.network.CodexNetwork;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -335,7 +335,7 @@ public final class QuestTracker {
         CLIENT_STATS.clear();
         if (player instanceof ServerPlayer sp) {
             QuestProgressState.get(sp.serverLevel()).clear(sp.getUUID());
-            BoundlessNetwork.syncPlayer(sp);
+            CodexNetwork.syncPlayer(sp);
             return;
         }
         if (player.level().isClientSide) {
@@ -385,7 +385,7 @@ public final class QuestTracker {
             boolean ready = dependenciesMet(q, player) && isReady(q, player);
             if (ready && cur == Status.INCOMPLETE) {
                 clientSetStatus(q.id, Status.COMPLETED);
-                BoundlessNetwork.sendToastLocal(q.id);
+                CodexNetwork.sendToastLocal(q.id);
                 continue;
             }
             if (!ready && cur == Status.COMPLETED) {

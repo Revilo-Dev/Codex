@@ -1,4 +1,4 @@
-package net.revilodev.boundless;
+package net.revilodev.codex;
 
 import java.util.List;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -21,12 +21,12 @@ public final class Config {
     @SubscribeEvent
     public static void onLoad(ModConfigEvent.Loading e) {
         if (e.getConfig().getSpec() == SPEC)
-            BoundlessMod.LOGGER.info("[Boundless] Config loaded: {}", disabledCategories());
+            CodexMod.LOGGER.info("[Codex] Config loaded: {}", disabledCategories());
     }
 
     @SubscribeEvent
     public static void onReload(ModConfigEvent.Reloading e) {
         if (e.getConfig().getSpec() == SPEC)
-            BoundlessMod.LOGGER.info("[Boundless] Config reloaded: {}", disabledCategories());
+            CodexMod.LOGGER.info("[Codex] Config reloaded: {}", disabledCategories());
     }
 }

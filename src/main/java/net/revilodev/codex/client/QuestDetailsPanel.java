@@ -1,4 +1,4 @@
-package net.revilodev.boundless.client;
+package net.revilodev.codex.client;
 
 import net.minecraft.advancements.AdvancementHolder;
 import net.minecraft.advancements.DisplayInfo;
@@ -21,9 +21,9 @@ import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
-import net.revilodev.boundless.network.BoundlessNetwork;
-import net.revilodev.boundless.quest.QuestData;
-import net.revilodev.boundless.quest.QuestTracker;
+import net.revilodev.codex.network.CodexNetwork;
+import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.quest.QuestTracker;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +68,7 @@ public final class QuestDetailsPanel extends AbstractWidget {
 
         this.complete = new CompleteButton(getX(), getY(), () -> {
             if (quest != null && mc.player != null) {
-                PacketDistributor.sendToServer(new BoundlessNetwork.Redeem(quest.id));
+                PacketDistributor.sendToServer(new CodexNetwork.Redeem(quest.id));
                 QuestTracker.clientSetStatus(quest.id, QuestTracker.Status.REDEEMED);
                 if (this.onBack != null) this.onBack.run();
             }
@@ -78,7 +78,7 @@ public final class QuestDetailsPanel extends AbstractWidget {
 
         this.reject = new RejectButton(getX(), getY(), () -> {
             if (quest != null && mc.player != null && quest.optional) {
-                PacketDistributor.sendToServer(new BoundlessNetwork.Reject(quest.id));
+                PacketDistributor.sendToServer(new CodexNetwork.Reject(quest.id));
                 QuestTracker.clientSetStatus(quest.id, QuestTracker.Status.REJECTED);
                 if (this.onBack != null) this.onBack.run();
             }

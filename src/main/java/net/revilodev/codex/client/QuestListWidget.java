@@ -1,4 +1,4 @@
-package net.revilodev.boundless.client;
+package net.revilodev.codex.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -11,9 +11,9 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.revilodev.boundless.Config;
-import net.revilodev.boundless.quest.QuestData;
-import net.revilodev.boundless.quest.QuestTracker;
+import net.revilodev.codex.Config;
+import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.quest.QuestTracker;
 
 import java.util.ArrayList;
 import java.util.List;

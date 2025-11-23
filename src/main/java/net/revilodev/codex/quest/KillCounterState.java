@@ -1,4 +1,4 @@
-package net.revilodev.boundless.quest;
+package net.revilodev.codex.quest;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;

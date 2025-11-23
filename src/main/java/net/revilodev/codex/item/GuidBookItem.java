@@ -1,4 +1,4 @@
-package net.revilodev.boundless.item;
+package net.revilodev.codex.item;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionHand;
@@ -7,11 +7,11 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
-import net.revilodev.boundless.network.BoundlessNetwork;
+import net.revilodev.codex.network.CodexNetwork;
 
-public class QuestBookItem extends Item {
+public class GuidBookItem extends Item {
 
-    public QuestBookItem(Properties props) {
+    public GuidBookItem(Properties props) {
         super(props);
     }
 
@@ -20,7 +20,7 @@ public class QuestBookItem extends Item {
 
         // SERVER side → tell client to open screen
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
-            BoundlessNetwork.sendOpenQuestBook(sp);
+            CodexNetwork.sendOpenQuestBook(sp);
         }
 
         // return normally

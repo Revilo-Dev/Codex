@@ -1,9 +1,9 @@
-package net.revilodev.boundless.client;
+package net.revilodev.codex.client;
 
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.event.level.LevelEvent;
-import net.revilodev.boundless.quest.QuestData;
-import net.revilodev.boundless.quest.QuestTracker;
+import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.quest.QuestTracker;
 
 public final class ClientQuestEvents {
 

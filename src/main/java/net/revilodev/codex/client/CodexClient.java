@@ -1,12 +1,12 @@
-package net.revilodev.boundless.client;
+package net.revilodev.codex.client;
 
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.common.NeoForge;
 
 @OnlyIn(Dist.CLIENT)
-public final class BoundlessClient {
-    private BoundlessClient() {}
+public final class CodexClient {
+    private CodexClient() {}
 
     public static void init() {
         NeoForge.EVENT_BUS.addListener(QuestPanelClient::onScreenInit);

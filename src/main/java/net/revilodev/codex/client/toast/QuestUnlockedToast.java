@@ -1,4 +1,4 @@
-package net.revilodev.boundless.client.toast;
+package net.revilodev.codex.client.toast;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;

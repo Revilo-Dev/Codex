@@ -1,13 +1,13 @@
-package net.revilodev.boundless.client.screen;
+package net.revilodev.codex.client.screen;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.revilodev.boundless.client.CategoryTabsWidget;
-import net.revilodev.boundless.client.QuestDetailsPanel;
-import net.revilodev.boundless.client.QuestListWidget;
-import net.revilodev.boundless.quest.QuestData;
+import net.revilodev.codex.client.CategoryTabsWidget;
+import net.revilodev.codex.client.QuestDetailsPanel;
+import net.revilodev.codex.client.QuestListWidget;
+import net.revilodev.codex.quest.QuestData;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.api.distmarker.Dist;
 

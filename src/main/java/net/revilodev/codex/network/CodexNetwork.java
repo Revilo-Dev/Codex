@@ -1,4 +1,4 @@
-package net.revilodev.boundless.network;
+package net.revilodev.codex.network;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -16,16 +16,16 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import net.revilodev.boundless.client.toast.QuestUnlockedToast;
-import net.revilodev.boundless.quest.KillCounterState;
-import net.revilodev.boundless.quest.QuestData;
-import net.revilodev.boundless.quest.QuestProgressState;
-import net.revilodev.boundless.quest.QuestTracker;
+import net.revilodev.codex.client.toast.QuestUnlockedToast;
+import net.revilodev.codex.quest.KillCounterState;
+import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.quest.QuestProgressState;
+import net.revilodev.codex.quest.QuestTracker;
 
 import java.util.ArrayList;
 import java.util.List;
 
-public final class BoundlessNetwork {
+public final class CodexNetwork {
 
     private static final String CHANNEL = "boundless";
     private static final String VERSION = "1";
@@ -33,10 +33,10 @@ public final class BoundlessNetwork {
 
     private static final Gson GSON = new GsonBuilder().setLenient().create();
 
-    private BoundlessNetwork() {}
+    private CodexNetwork() {}
 
     public static void bootstrap(IEventBus bus) {
-        bus.addListener(BoundlessNetwork::register);
+        bus.addListener(CodexNetwork::register);
     }
 
     private static void register(RegisterPayloadHandlersEvent event) {
@@ -45,15 +45,15 @@ public final class BoundlessNetwork {
 
         PayloadRegistrar r = event.registrar(CHANNEL).versioned(VERSION);
 
-        r.playToServer(Redeem.TYPE, Redeem.CODEC, BoundlessNetwork::handleRedeem);
-        r.playToServer(Reject.TYPE, Reject.CODEC, BoundlessNetwork::handleReject);
+        r.playToServer(Redeem.TYPE, Redeem.CODEC, CodexNetwork::handleRedeem);
+        r.playToServer(Reject.TYPE, Reject.CODEC, CodexNetwork::handleReject);
 
-        r.playToClient(SyncStatus.TYPE, SyncStatus.CODEC, BoundlessNetwork::handleSyncStatus);
-        r.playToClient(SyncKills.TYPE, SyncKills.CODEC, BoundlessNetwork::handleSyncKills);
-        r.playToClient(SyncClear.TYPE, SyncClear.CODEC, BoundlessNetwork::handleSyncClear);
-        r.playToClient(Toast.TYPE, Toast.CODEC, BoundlessNetwork::handleToast);
-        r.playToClient(OpenQuestBook.TYPE, OpenQuestBook.CODEC, BoundlessNetwork::handleOpenQuestBook);
-        r.playToClient(SyncQuests.TYPE, SyncQuests.CODEC, BoundlessNetwork::handleSyncQuests);
+        r.playToClient(SyncStatus.TYPE, SyncStatus.CODEC, CodexNetwork::handleSyncStatus);
+        r.playToClient(SyncKills.TYPE, SyncKills.CODEC, CodexNetwork::handleSyncKills);
+        r.playToClient(SyncClear.TYPE, SyncClear.CODEC, CodexNetwork::handleSyncClear);
+        r.playToClient(Toast.TYPE, Toast.CODEC, CodexNetwork::handleToast);
+        r.playToClient(OpenQuestBook.TYPE, OpenQuestBook.CODEC, CodexNetwork::handleOpenQuestBook);
+        r.playToClient(SyncQuests.TYPE, SyncQuests.CODEC, CodexNetwork::handleSyncQuests);
     }
 
     public record Redeem(String questId) implements CustomPacketPayload {
@@ -331,7 +331,7 @@ public final class BoundlessNetwork {
     private static final class ClientOnly {
         private static void openQuestBook() {
             net.minecraft.client.Minecraft.getInstance()
-                    .setScreen(new net.revilodev.boundless.client.screen.StandaloneQuestBookScreen());
+                    .setScreen(new net.revilodev.codex.client.screen.StandaloneQuestBookScreen());
         }
     }
 
