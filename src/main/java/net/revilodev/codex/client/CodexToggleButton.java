@@ -8,13 +8,13 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
 @OnlyIn(Dist.CLIENT)
-public class QuestToggleButton extends AbstractButton {
+public class CodexToggleButton extends AbstractButton {
     private ResourceLocation texNormal;
     private ResourceLocation texHover;
     private final Runnable onPress;
 
 
-    public QuestToggleButton(int x, int y, ResourceLocation normal, ResourceLocation hover, Runnable onPress) {
+    public CodexToggleButton(int x, int y, ResourceLocation normal, ResourceLocation hover, Runnable onPress) {
         super(x, y, 20, 18, Component.empty());
         this.texNormal = normal;
         this.texHover = hover;

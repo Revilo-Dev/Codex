@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.item.Item;
@@ -13,14 +14,13 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.Config;
 import net.revilodev.codex.quest.QuestData;
-import net.revilodev.codex.quest.QuestTracker;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
 @OnlyIn(Dist.CLIENT)
-public final class QuestListWidget extends AbstractWidget {
+public final class CodexListWidget extends AbstractWidget {
     private static final ResourceLocation ROW_TEX =
             ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_widget.png");
     private static final ResourceLocation ROW_TEX_DISABLED =
@@ -36,8 +36,8 @@ public final class QuestListWidget extends AbstractWidget {
 
     private String category = "all";
 
-    public QuestListWidget(int x, int y, int width, int height, Consumer<QuestData.Quest> onClick) {
-        super(x, y, width, height, net.minecraft.network.chat.Component.empty());
+    public CodexListWidget(int x, int y, int width, int height, Consumer<QuestData.Quest> onClick) {
+        super(x, y, width, height, Component.empty());
         this.mc = Minecraft.getInstance();
         this.onClick = onClick;
     }
@@ -83,13 +83,11 @@ public final class QuestListWidget extends AbstractWidget {
         int visible = 0;
         for (QuestData.Quest q : quests) {
             if (!matchesCategory(q)) continue;
-            if (QuestTracker.isVisible(q, mc.player)) visible++;
+            visible++;
         }
         return visible * (rowHeight + rowPad);
     }
 
-    // ---- Rendering ----
-    // Do NOT annotate with @Override, since mappings differ between Forge / NeoForge
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!this.visible) return;
         RenderSystem.enableBlend();
@@ -100,14 +98,13 @@ public final class QuestListWidget extends AbstractWidget {
         for (QuestData.Quest q : quests) {
             if (mc.player == null) continue;
             if (!matchesCategory(q)) continue;
-            if (!QuestTracker.isVisible(q, mc.player)) continue;
 
             int top = yOff + drawn * (rowHeight + rowPad);
             drawn++;
             if (top > this.getY() + this.height) break;
             if (top + rowHeight < this.getY()) continue;
 
-            boolean deps = QuestTracker.dependenciesMet(q, mc.player);
+            boolean deps = true;
             ResourceLocation rowTex = deps ? ROW_TEX : ROW_TEX_DISABLED;
             gg.blit(rowTex, this.getX(), top, 0, 0, 127, 27, 127, 27);
 
@@ -119,11 +116,13 @@ public final class QuestListWidget extends AbstractWidget {
             String name = q.name;
             int maxWidth = this.width - 42;
             int nameWidth = mc.font.width(name);
+            int color = deps ? 0xFFFFFF : 0xA0A0A0;
+
             if (nameWidth > maxWidth) {
                 String trimmed = mc.font.plainSubstrByWidth(name, maxWidth - mc.font.width("...")) + "...";
-                gg.drawString(mc.font, trimmed, this.getX() + 30, top + 9, deps ? 0xFFFFFF : 0xA0A0A0, false);
+                gg.drawString(mc.font, trimmed, this.getX() + 30, top + 9, color, false);
             } else {
-                gg.drawString(mc.font, name, this.getX() + 30, top + 9, deps ? 0xFFFFFF : 0xA0A0A0, false);
+                gg.drawString(mc.font, name, this.getX() + 30, top + 9, color, false);
             }
         }
 
@@ -138,8 +137,6 @@ public final class QuestListWidget extends AbstractWidget {
         }
     }
 
-    // ---- Input handling ----
-    // NeoForge 1.20.1 uses this exact signature
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!this.visible || !this.active) return false;
         int content = contentHeight();
@@ -150,7 +147,6 @@ public final class QuestListWidget extends AbstractWidget {
         return true;
     }
 
-    // Helper overload for screens calling the 4-arg version (not part of superclass)
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         return mouseScrolled(mouseX, mouseY, deltaY);
     }
@@ -165,7 +161,6 @@ public final class QuestListWidget extends AbstractWidget {
 
         for (QuestData.Quest q : quests) {
             if (!matchesCategory(q)) continue;
-            if (!QuestTracker.isVisible(q, mc.player)) continue;
             if (visibleIndex == idx) {
                 if (onClick != null) onClick.accept(q);
                 return true;
@@ -175,7 +170,7 @@ public final class QuestListWidget extends AbstractWidget {
         return false;
     }
 
+    @Override
     protected void updateWidgetNarration(NarrationElementOutput narration) {
-        // no narration
     }
 }

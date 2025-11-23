@@ -3,8 +3,9 @@ package net.revilodev.codex.client;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.ImageButton;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.ImageButton;
+import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
@@ -13,14 +14,13 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.revilodev.codex.quest.QuestData;
-import net.revilodev.codex.quest.QuestTracker;
 
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.WeakHashMap;
 
 @OnlyIn(Dist.CLIENT)
-public final class QuestPanelClient {
+public final class CodexPanelClient {
     private static final ResourceLocation BTN_TEX =
             ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_button.png");
     private static final ResourceLocation BTN_TEX_HOVER =
@@ -37,8 +37,7 @@ public final class QuestPanelClient {
     private static Field LEFT_FIELD;
     private static boolean lastQuestOpen = false;
 
-    private QuestPanelClient() {
-    }
+    private CodexPanelClient() {}
 
     public static void onScreenInit(ScreenEvent.Init.Post e) {
         Screen s = e.getScreen();
@@ -48,15 +47,15 @@ public final class QuestPanelClient {
         STATES.put(s, st);
         int btnX = inv.getGuiLeft() + 125;
         int btnY = inv.getGuiTop() + 61;
-        QuestToggleButton btn = new QuestToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
+        CodexToggleButton btn = new CodexToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
         st.btn = btn;
         st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H);
         e.addListener(st.bg);
-        st.list = new QuestListWidget(0, 0, 127, PANEL_H - 20, q -> openDetails(st, q));
+        st.list = new CodexListWidget(0, 0, 127, PANEL_H - 20, q -> openDetails(st, q));
         st.list.setQuests(QuestData.all());
         st.list.setCategory(st.selectedCategory);
         e.addListener(st.list);
-        st.details = new QuestDetailsPanel(0, 0, 127, PANEL_H - 20, () -> closeDetails(st));
+        st.details = new CodexDetailsPanel(0, 0, 127, PANEL_H - 20, () -> closeDetails(st));
         e.addListener(st.details);
         e.addListener(st.details.backButton());
         e.addListener(st.details.completeButton());
@@ -90,13 +89,11 @@ public final class QuestPanelClient {
         Screen s = e.getScreen();
         State st = STATES.get(s);
         if (st == null || !(s instanceof InventoryScreen inv)) return;
-        if (st.btn != null && Minecraft.getInstance().player != null) {
-            if (QuestTracker.hasAnyCompleted(Minecraft.getInstance().player)) {
-                st.btn.setTextures(BTN_TEX_TOAST, BTN_TEX_TOAST_HOVER);
-            } else {
-                st.btn.setTextures(BTN_TEX, BTN_TEX_HOVER);
-            }
+
+        if (st.btn != null) {
+            st.btn.setTextures(BTN_TEX, BTN_TEX_HOVER);
         }
+
         if (st.open) {
             setLeft(inv, computeCenteredLeft(inv));
         }
@@ -174,7 +171,7 @@ public final class QuestPanelClient {
         if (st.list != null) st.list.setBounds(px, py, pw, ph);
         if (st.details != null) {
             st.details.setBounds(px, py, pw, ph);
-            st.details.backButton().setPosition(px, py + ph - st.details.backButton().getHeight() - 4);
+            st.details.backButton().setPosition(px + 2, py + ph - st.details.backButton().getHeight() - 4);
             st.details.completeButton().setPosition(px + (pw - st.details.completeButton().getWidth()) / 2, py + ph - st.details.completeButton().getHeight() - 4);
             st.details.rejectButton().setPosition(px + pw - st.details.rejectButton().getWidth() - 2, py + ph - st.details.rejectButton().getHeight() - 4);
         }
@@ -297,25 +294,28 @@ public final class QuestPanelClient {
             this.height = h;
         }
 
+        @Override
         protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
             RenderSystem.disableBlend();
             gg.blit(PANEL_TEX, getX(), getY(), 0, 0, width, height, width, height);
         }
 
+        @Override
         public boolean mouseClicked(double mouseX, double mouseY, int button) {
             return false;
         }
 
-        protected void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput n) {
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput n) {
         }
     }
 
     private static final class State {
         final InventoryScreen inv;
-        QuestToggleButton btn;
+        CodexToggleButton btn;
         PanelBackground bg;
-        QuestListWidget list;
-        QuestDetailsPanel details;
+        CodexListWidget list;
+        CodexDetailsPanel details;
         CategoryTabsWidget tabs;
         boolean showingDetails;
         boolean open;

@@ -9,10 +9,10 @@ public final class CodexClient {
     private CodexClient() {}
 
     public static void init() {
-        NeoForge.EVENT_BUS.addListener(QuestPanelClient::onScreenInit);
-        NeoForge.EVENT_BUS.addListener(QuestPanelClient::onScreenClosing);
-        NeoForge.EVENT_BUS.addListener(QuestPanelClient::onScreenRenderPre);
-        NeoForge.EVENT_BUS.addListener(QuestPanelClient::onScreenRenderPost);
-        NeoForge.EVENT_BUS.addListener(QuestPanelClient::onMouseScrolled);
+        NeoForge.EVENT_BUS.addListener(CodexPanelClient::onScreenInit);
+        NeoForge.EVENT_BUS.addListener(CodexPanelClient::onScreenClosing);
+        NeoForge.EVENT_BUS.addListener(CodexPanelClient::onScreenRenderPre);
+        NeoForge.EVENT_BUS.addListener(CodexPanelClient::onScreenRenderPost);
+        NeoForge.EVENT_BUS.addListener(CodexPanelClient::onMouseScrolled);
     }
 }

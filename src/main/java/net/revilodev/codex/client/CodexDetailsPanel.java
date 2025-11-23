@@ -20,17 +20,13 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.neoforged.neoforge.network.PacketDistributor;
-import net.revilodev.codex.network.CodexNetwork;
 import net.revilodev.codex.quest.QuestData;
-import net.revilodev.codex.quest.QuestTracker;
 
 import java.util.ArrayList;
 import java.util.List;
 
-
 @OnlyIn(Dist.CLIENT)
-public final class QuestDetailsPanel extends AbstractWidget {
+public final class CodexDetailsPanel extends AbstractWidget {
     private static final int LINE_ITEM_ROW = 22;
     private static final int BOTTOM_PADDING = 28;
 
@@ -50,46 +46,54 @@ public final class QuestDetailsPanel extends AbstractWidget {
     private static final class DepClickRegion {
         final int x, y, w, h;
         final String questId;
+
         DepClickRegion(int x, int y, int w, int h, String questId) {
-            this.x = x; this.y = y; this.w = w; this.h = h; this.questId = questId;
+            this.x = x;
+            this.y = y;
+            this.w = w;
+            this.h = h;
+            this.questId = questId;
         }
+
         boolean contains(double mx, double my) {
             return mx >= x && mx <= x + w && my >= y && my <= y + h;
         }
     }
 
-    public QuestDetailsPanel(int x, int y, int w, int h, Runnable onBack) {
+    public CodexDetailsPanel(int x, int y, int w, int h, Runnable onBack) {
         super(x, y, w, h, Component.empty());
         this.onBack = onBack;
 
-        this.back = new BackButton(getX(), getY(), () -> { if (this.onBack != null) this.onBack.run(); });
+        this.back = new BackButton(getX(), getY(), () -> {
+            if (this.onBack != null) this.onBack.run();
+        });
         this.back.visible = false;
         this.back.active = false;
 
         this.complete = new CompleteButton(getX(), getY(), () -> {
-            if (quest != null && mc.player != null) {
-                PacketDistributor.sendToServer(new CodexNetwork.Redeem(quest.id));
-                QuestTracker.clientSetStatus(quest.id, QuestTracker.Status.REDEEMED);
-                if (this.onBack != null) this.onBack.run();
-            }
+            if (this.onBack != null) this.onBack.run();
         });
         this.complete.visible = false;
         this.complete.active = false;
 
         this.reject = new RejectButton(getX(), getY(), () -> {
-            if (quest != null && mc.player != null && quest.optional) {
-                PacketDistributor.sendToServer(new CodexNetwork.Reject(quest.id));
-                QuestTracker.clientSetStatus(quest.id, QuestTracker.Status.REJECTED);
-                if (this.onBack != null) this.onBack.run();
-            }
+            if (this.onBack != null) this.onBack.run();
         });
         this.reject.visible = false;
         this.reject.active = false;
     }
 
-    public AbstractButton backButton() { return back; }
-    public AbstractButton completeButton() { return complete; }
-    public AbstractButton rejectButton() { return reject; }
+    public AbstractButton backButton() {
+        return back;
+    }
+
+    public AbstractButton completeButton() {
+        return complete;
+    }
+
+    public AbstractButton rejectButton() {
+        return reject;
+    }
 
     public void setBounds(int x, int y, int w, int h) {
         this.setX(x);
@@ -109,6 +113,7 @@ public final class QuestDetailsPanel extends AbstractWidget {
         this.scrollY = 0f;
     }
 
+    @Override
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!this.visible || quest == null) return;
 
@@ -152,14 +157,11 @@ public final class QuestDetailsPanel extends AbstractWidget {
                 int lineY = curY[0];
                 int textX = x + 24;
                 int textW = mc.font.width(depName);
-                int color = 0xFF5555;
+                int color = 0xFFFFFF;
 
-                if (depQuest != null && mc.player != null) {
-                    var status = QuestTracker.getStatus(depQuest, mc.player);
-                    if (status == QuestTracker.Status.REDEEMED) color = 0x55FF55;
+                if (depQuest != null) {
+                    depQuest.iconItem().ifPresent(icon -> gg.renderItem(new ItemStack(icon), x + 4, lineY));
                 }
-
-                if (depQuest != null) depQuest.iconItem().ifPresent(icon -> gg.renderItem(new ItemStack(icon), x + 4, lineY));
 
                 gg.drawString(mc.font, depName, textX, lineY + 4, color, false);
                 gg.fill(textX, lineY + 14, textX + textW, lineY + 15, color);
@@ -188,8 +190,8 @@ public final class QuestDetailsPanel extends AbstractWidget {
                     boolean treatAsTag = isTagSyntax || direct == null;
 
                     int need = t.count;
-                    int found = QuestTracker.getCountInInventory(t.id, mc.player);
-                    boolean ready = found >= need;
+                    int found = 0;
+                    boolean ready = false;
                     int color = ready ? 0x55FF55 : 0xFF5555;
 
                     int px = x + 4;
@@ -197,14 +199,17 @@ public final class QuestDetailsPanel extends AbstractWidget {
                     Item iconItem;
                     if (treatAsTag) {
                         List<Item> tagItems = resolveTagItems(rl);
-                        iconItem = tagItems.isEmpty() ? null : tagItems.get((int)((mc.level != null ? mc.level.getGameTime() : 0) / 20 % tagItems.size()));
-                    } else iconItem = direct;
+                        iconItem = tagItems.isEmpty() ? null : tagItems.get((int) ((mc.level != null ? mc.level.getGameTime() : 0) / 20 % tagItems.size()));
+                    } else {
+                        iconItem = direct;
+                    }
 
                     if (iconItem != null) {
                         ItemStack st = new ItemStack(iconItem);
                         gg.renderItem(st, px, curY[0]);
-                        if (mouseX >= px && mouseX <= px + 16 && mouseY >= curY[0] && mouseY <= curY[0] + 16)
+                        if (mouseX >= px && mouseX <= px + 16 && mouseY >= curY[0] && mouseY <= curY[0] + 16) {
                             hoveredTooltips.add(st.getHoverName());
+                        }
                         px += 20;
                     }
 
@@ -219,20 +224,23 @@ public final class QuestDetailsPanel extends AbstractWidget {
                     EntityType<?> et = BuiltInRegistries.ENTITY_TYPE.getOptional(rl).orElse(null);
                     String eName = et == null ? rl.toString() : et.getDescription().getString();
 
-                    int have = QuestTracker.getKillCount(mc.player, t.id);
+                    int have = 0;
                     int color = have >= t.count ? 0x55FF55 : 0xFF5555;
 
-                    Item iconItem = null;
+                    Item iconItem;
                     if (et != null) {
                         ResourceLocation eggRl = ResourceLocation.fromNamespaceAndPath(rl.getNamespace(), rl.getPath() + "_spawn_egg");
                         iconItem = BuiltInRegistries.ITEM.getOptional(eggRl).orElse(Items.DIAMOND_SWORD);
-                    } else iconItem = Items.DIAMOND_SWORD;
+                    } else {
+                        iconItem = Items.DIAMOND_SWORD;
+                    }
 
                     ItemStack icon = new ItemStack(iconItem);
                     gg.renderItem(icon, x + 4, curY[0]);
 
-                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18)
+                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18) {
                         hoveredTooltips.add(Component.literal(eName));
+                    }
 
                     gg.drawString(mc.font, have + "/" + t.count, x + 24, curY[0] + 4, color, false);
                     curY[0] += LINE_ITEM_ROW;
@@ -244,15 +252,16 @@ public final class QuestDetailsPanel extends AbstractWidget {
                     ResourceLocation rl = ResourceLocation.parse(t.id);
                     MobEffect eff = BuiltInRegistries.MOB_EFFECT.getOptional(rl).orElse(null);
                     String eName = eff == null ? rl.toString() : Component.translatable(eff.getDescriptionId()).getString();
-                    boolean has = QuestTracker.hasEffect(mc.player, t.id);
+                    boolean has = false;
                     int color = has ? 0x55FF55 : 0xFF5555;
 
                     ResourceLocation tex = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/effects/" + rl.getPath() + ".png");
                     gg.blit(tex, x + 4, curY[0], 0, 0, 16, 16, 16, 16);
                     gg.drawString(mc.font, eName, x + 26, curY[0] + 6, color, false);
 
-                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18)
+                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18) {
                         hoveredTooltips.add(Component.literal(eName));
+                    }
 
                     curY[0] += LINE_ITEM_ROW;
 
@@ -286,14 +295,15 @@ public final class QuestDetailsPanel extends AbstractWidget {
                         }
                     }
 
-                    boolean done = QuestTracker.hasAdvancement(mc.player, t.id);
+                    boolean done = false;
                     int color = done ? 0x55FF55 : 0xFF5555;
 
                     gg.renderItem(icon, x + 4, curY[0]);
                     gg.drawString(mc.font, advName, x + 26, curY[0] + 6, color, false);
 
-                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18)
+                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18) {
                         hoveredTooltips.add(Component.literal(advName));
+                    }
 
                     curY[0] += LINE_ITEM_ROW;
 
@@ -301,14 +311,15 @@ public final class QuestDetailsPanel extends AbstractWidget {
                     gg.drawString(mc.font, "Stat:", x + 4, curY[0], 0x1d9633, false);
                     curY[0] += mc.font.lineHeight + 2;
 
-                    int have = QuestTracker.getStatCount(mc.player, t.id);
+                    int have = 0;
                     int color = have >= t.count ? 0x55FF55 : 0xFF5555;
 
                     ItemStack icon = new ItemStack(Items.PAPER);
                     gg.renderItem(icon, x + 4, curY[0]);
                     gg.drawString(mc.font, have + "/" + t.count, x + 24, curY[0] + 4, color, false);
-                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18)
+                    if (mouseX >= x + 4 && mouseX <= x + 20 && mouseY >= curY[0] && mouseY <= curY[0] + 18) {
                         hoveredTooltips.add(Component.literal(t.id));
+                    }
                     curY[0] += LINE_ITEM_ROW;
                 }
             }
@@ -318,8 +329,6 @@ public final class QuestDetailsPanel extends AbstractWidget {
         boolean hasItemRewards = quest.rewards != null && quest.rewards.items != null && !quest.rewards.items.isEmpty();
         boolean hasCommandReward = quest.rewards != null && quest.rewards.command != null && !quest.rewards.command.isBlank();
         boolean hasExpReward = quest.rewards != null && quest.rewards.hasExp();
-
-
 
         if (hasItemRewards || hasCommandReward || hasExpReward) {
             gg.drawWordWrap(mc.font, Component.literal("Reward:"), x + 4, curY[0], w - 8, 0xA8FFA8);
@@ -363,24 +372,17 @@ public final class QuestDetailsPanel extends AbstractWidget {
                 curY[0] += LINE_ITEM_ROW;
             }
 
-
             curY[0] += 2;
         }
 
         gg.disableScissor();
         for (Component tip : hoveredTooltips) gg.renderTooltip(mc.font, tip, mouseX, mouseY);
 
-        boolean depsMet = QuestTracker.dependenciesMet(quest, mc.player);
-        boolean red = QuestTracker.getStatus(quest, mc.player) == QuestTracker.Status.REDEEMED;
-        boolean rej = QuestTracker.getStatus(quest, mc.player) == QuestTracker.Status.REJECTED;
-        boolean done = red || rej;
-        boolean ready = depsMet && !done && QuestTracker.isReady(quest, mc.player);
-
-        complete.active = ready;
-        complete.visible = !done;
+        complete.active = false;
+        complete.visible = false;
         reject.setOptionalAllowed(quest.optional);
-        reject.active = !done && quest.optional;
-        reject.visible = !done;
+        reject.active = false;
+        reject.visible = false;
     }
 
     private int measureContentHeight(int panelWidth) {
@@ -400,7 +402,6 @@ public final class QuestDetailsPanel extends AbstractWidget {
         boolean hasItemRewards = quest.rewards != null && quest.rewards.items != null && !quest.rewards.items.isEmpty();
         boolean hasCommandReward = quest.rewards != null && quest.rewards.command != null && !quest.rewards.command.isBlank();
         boolean hasExpReward = quest.rewards != null && quest.rewards.hasExp();
-
 
         if (hasItemRewards || hasCommandReward || hasExpReward) {
             y += mc.font.wordWrapHeight("Reward:", w - 8) + 4;
@@ -438,32 +439,52 @@ public final class QuestDetailsPanel extends AbstractWidget {
         return true;
     }
 
-    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) { return mouseScrolled(mouseX, mouseY, deltaY); }
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        return mouseScrolled(mouseX, mouseY, deltaY);
+    }
 
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!this.visible || !this.active) return false;
         for (DepClickRegion r : depRegions)
             if (r.contains(mouseX, mouseY)) {
                 QuestData.Quest depQuest = QuestData.byId(r.questId).orElse(null);
-                if (depQuest != null) { setQuest(depQuest); return true; }
+                if (depQuest != null) {
+                    setQuest(depQuest);
+                    return true;
+                }
             }
         return false;
     }
 
-    protected void updateWidgetNarration(NarrationElementOutput narration) {}
+    @Override
+    protected void updateWidgetNarration(NarrationElementOutput narration) {
+    }
 
     private static final class BackButton extends AbstractButton {
         private static final ResourceLocation TEX_NORMAL = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_back_button.png");
         private static final ResourceLocation TEX_HOVER = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_back_highlighted.png");
         private final Runnable onPress;
-        public BackButton(int x, int y, Runnable onPress) { super(x, y, 24, 20, Component.empty()); this.onPress = onPress; }
-        public void onPress() { if (onPress != null) onPress.run(); }
+
+        public BackButton(int x, int y, Runnable onPress) {
+            super(x, y, 24, 20, Component.empty());
+            this.onPress = onPress;
+        }
+
+        @Override
+        public void onPress() {
+            if (onPress != null) onPress.run();
+        }
+
+        @Override
         protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
             boolean hovered = this.isMouseOver(mouseX, mouseY);
             ResourceLocation tex = hovered ? TEX_HOVER : TEX_NORMAL;
             gg.blit(tex, getX(), getY(), 0, 0, this.width, this.height, this.width, this.height);
         }
-        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {
+        }
     }
 
     private static final class CompleteButton extends AbstractButton {
@@ -471,8 +492,20 @@ public final class QuestDetailsPanel extends AbstractWidget {
         private static final ResourceLocation TEX_HOVER = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_complete_button_highlighted.png");
         private static final ResourceLocation TEX_DISABLED = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_complete_button_disabled.png");
         private final Runnable onPress;
-        public CompleteButton(int x, int y, Runnable onPress) { super(x, y, 68, 20, Component.translatable("quest.boundless.complete")); this.onPress = onPress; }
-        public void onPress() { if (onPress != null) onPress.run(); this.active = false; this.visible = false; }
+
+        public CompleteButton(int x, int y, Runnable onPress) {
+            super(x, y, 68, 20, Component.translatable("quest.boundless.complete"));
+            this.onPress = onPress;
+        }
+
+        @Override
+        public void onPress() {
+            if (onPress != null) onPress.run();
+            this.active = false;
+            this.visible = false;
+        }
+
+        @Override
         protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
             boolean hovered = this.active && this.isMouseOver(mouseX, mouseY);
             ResourceLocation tex = !this.active ? TEX_DISABLED : (hovered ? TEX_HOVER : TEX_NORMAL);
@@ -484,17 +517,36 @@ public final class QuestDetailsPanel extends AbstractWidget {
             int color = this.active ? 0xFFFFFF : 0x808080;
             gg.drawString(font, getMessage(), textX, textY, color, false);
         }
-        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {
+        }
     }
 
     private static final class RejectButton extends AbstractButton {
         private static final ResourceLocation TEX_NORMAL = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_reject.png");
         private static final ResourceLocation TEX_HOVER = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_reject_highlighted.png");
         private static final ResourceLocation TEX_DISABLED = ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_reject_disabled.png");
-        private final Runnable onPress; private boolean optionalAllowed;
-        public RejectButton(int x, int y, Runnable onPress) { super(x, y, 24, 20, Component.empty()); this.onPress = onPress; }
-        public void setOptionalAllowed(boolean v) { this.optionalAllowed = v; }
-        public void onPress() { if (this.active && onPress != null) onPress.run(); this.active = false; this.visible = false; }
+        private final Runnable onPress;
+        private boolean optionalAllowed;
+
+        public RejectButton(int x, int y, Runnable onPress) {
+            super(x, y, 24, 20, Component.empty());
+            this.onPress = onPress;
+        }
+
+        public void setOptionalAllowed(boolean v) {
+            this.optionalAllowed = v;
+        }
+
+        @Override
+        public void onPress() {
+            if (this.active && onPress != null) onPress.run();
+            this.active = false;
+            this.visible = false;
+        }
+
+        @Override
         protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
             boolean hovered = this.isMouseOver(mouseX, mouseY);
             ResourceLocation tex = !this.active ? TEX_DISABLED : (hovered ? TEX_HOVER : TEX_NORMAL);
@@ -502,6 +554,9 @@ public final class QuestDetailsPanel extends AbstractWidget {
             if (hovered && !this.active && !optionalAllowed)
                 gg.renderTooltip(Minecraft.getInstance().font, Component.literal("This quest is not optional"), mouseX, mouseY);
         }
-        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {
+        }
     }
 }
