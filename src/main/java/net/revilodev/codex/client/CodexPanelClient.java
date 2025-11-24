@@ -1,7 +1,6 @@
 package net.revilodev.codex.client;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.ImageButton;
@@ -18,51 +17,68 @@ import net.revilodev.codex.data.GuideData;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.List;
 
 @OnlyIn(Dist.CLIENT)
 public final class CodexPanelClient {
+
     private static final ResourceLocation BTN_TEX =
             ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_button.png");
     private static final ResourceLocation BTN_TEX_HOVER =
             ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_button_hovered.png");
-    private static final ResourceLocation BTN_TEX_TOAST =
-            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_toast.png");
-    private static final ResourceLocation BTN_TEX_TOAST_HOVER =
-            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_toast_highlighted.png");
+
     private static final ResourceLocation PANEL_TEX =
             ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/panel.png");
+
     private static final int PANEL_W = 147;
     private static final int PANEL_H = 166;
+
     private static final Map<Screen, State> STATES = new WeakHashMap<>();
     private static Field LEFT_FIELD;
-    private static boolean lastQuestOpen = false;
+    private static boolean LAST_OPEN = false;
 
     private CodexPanelClient() {}
+
+    // ---------------------------------------------------------------------
+    // Initialization
+    // ---------------------------------------------------------------------
 
     public static void onScreenInit(ScreenEvent.Init.Post e) {
         Screen s = e.getScreen();
         if (!(s instanceof InventoryScreen inv)) return;
+
         GuideData.loadClient(false);
+
         State st = new State(inv);
         STATES.put(s, st);
+
+        // Toggle button
         int btnX = inv.getGuiLeft() + 145;
         int btnY = inv.getGuiTop() + 61;
-        CodexToggleButton btn = new CodexToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
-        st.btn = btn;
+        st.btn = new CodexToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
+        e.addListener(st.btn);
+
+        // Background
         st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H);
         e.addListener(st.bg);
-        st.list = new CodexListWidget(0, 0, 127, PANEL_H - 20, c -> openDetails(st, c));
-        st.list.setChapters(GuideData.all());
-        st.list.setCategory(st.selectedCategory);
+
+        // CATEGORY + CHAPTER LIST
+        st.list = new CodexListWidget(
+                0, 0, 127, PANEL_H - 20,
+                category -> openCategory(st, category),
+                chapter -> openDetails(st, chapter)
+        );
+        st.list.showCategories(GuideData.allCategories());
         e.addListener(st.list);
+
+        // DETAILS PANEL
         st.details = new CodexDetailsPanel(0, 0, 127, PANEL_H - 20, () -> closeDetails(st));
         e.addListener(st.details);
         e.addListener(st.details.backButton());
-        e.addListener(st.details.completeButton());
-        e.addListener(st.details.rejectButton());
-        e.addListener(btn);
+
         reposition(inv, st);
-        if (lastQuestOpen) {
+
+        if (LAST_OPEN) {
             st.open = true;
             st.originalLeft = getLeft(inv);
             setLeft(inv, computeCenteredLeft(inv));
@@ -72,24 +88,24 @@ public final class CodexPanelClient {
 
     public static void onScreenClosing(ScreenEvent.Closing e) {
         State st = STATES.remove(e.getScreen());
-        if (st == null) return;
-        if (st.open && st.originalLeft != null) {
+        if (st != null && st.open && st.originalLeft != null) {
             setLeft(st.inv, st.originalLeft);
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Render
+    // ---------------------------------------------------------------------
 
     public static void onScreenRenderPre(ScreenEvent.Render.Pre e) {
         Screen s = e.getScreen();
         State st = STATES.get(s);
         if (st == null || !(s instanceof InventoryScreen inv)) return;
 
-        if (st.btn != null) {
-            st.btn.setTextures(BTN_TEX, BTN_TEX_HOVER);
-        }
+        if (st.btn != null) st.btn.setTextures(BTN_TEX, BTN_TEX_HOVER);
 
-        if (st.open) {
-            setLeft(inv, computeCenteredLeft(inv));
-        }
+        if (st.open) setLeft(inv, computeCenteredLeft(inv));
+
         reposition(inv, st);
         updateVisibility(st);
         handleRecipeButtonRules(inv, st);
@@ -102,46 +118,99 @@ public final class CodexPanelClient {
         State st = STATES.get(s);
         if (st == null || !(s instanceof InventoryScreen inv)) return;
         if (!st.open) return;
+
         int px = computePanelX(inv) + 10;
         int py = inv.getGuiTop() + 10;
         int pw = 127;
         int ph = PANEL_H - 20;
+
         double mx = e.getMouseX();
         double my = e.getMouseY();
+        double dy = e.getScrollDeltaY();
+
         boolean used = false;
-        if (st.list != null && st.list.visible) {
+
+        if (st.list.visible) {
             if (mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
-                double dY = e.getScrollDeltaY();
-                used = st.list.mouseScrolled(mx, my, dY) || st.list.mouseScrolled(mx, my, 0.0, dY);
+                used = st.list.mouseScrolled(mx, my, dy) || st.list.mouseScrolled(mx, my, 0.0, dy);
             }
         }
-        if (st.details != null && st.details.visible) {
+        if (st.details.visible) {
             if (mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
-                double dY = e.getScrollDeltaY();
-                used = st.details.mouseScrolled(mx, my, dY) || st.details.mouseScrolled(mx, my, 0.0, dY) || used;
+                used = st.details.mouseScrolled(mx, my, dy) || st.details.mouseScrolled(mx, my, 0.0, dy) || used;
             }
         }
+
         if (used) e.setCanceled(true);
     }
 
+    // ---------------------------------------------------------------------
+    // Behavior
+    // ---------------------------------------------------------------------
+
     private static void toggle(State st) {
         st.open = !st.open;
-        lastQuestOpen = st.open;
+        LAST_OPEN = st.open;
+
         if (st.open) {
             if (st.originalLeft == null) st.originalLeft = getLeft(st.inv);
             setLeft(st.inv, computeCenteredLeft(st.inv));
         } else if (st.originalLeft != null) {
             setLeft(st.inv, st.originalLeft);
         }
-        reposition(st.inv, st);
+
         updateVisibility(st);
     }
+
+    private static void openCategory(State st, GuideData.Category cat) {
+        st.currentCategory = cat;
+        st.showingChapters = true;
+        st.list.showChapters(GuideData.chaptersInCategory(cat.id));
+        updateVisibility(st);
+    }
+
+    private static void openDetails(State st, GuideData.Chapter chapter) {
+        st.details.setChapter(chapter);
+        st.showingDetails = true;
+        updateVisibility(st);
+    }
+
+    private static void closeDetails(State st) {
+        st.showingDetails = false;
+
+        // Return to chapters list
+        if (st.currentCategory != null) {
+            st.list.showChapters(GuideData.chaptersInCategory(st.currentCategory.id));
+            st.showingChapters = true;
+        }
+
+        updateVisibility(st);
+    }
+
+    private static void updateVisibility(State st) {
+        boolean listVisible = st.open && !st.showingDetails;
+        boolean detailsVisible = st.open && st.showingDetails;
+
+        st.bg.visible = st.open;
+
+        st.list.visible = listVisible;
+        st.list.active = listVisible;
+
+        st.details.visible = detailsVisible;
+        st.details.active = detailsVisible;
+        st.details.backButton().visible = detailsVisible;
+        st.details.backButton().active = detailsVisible;
+    }
+
+    // ---------------------------------------------------------------------
+    // Layout
+    // ---------------------------------------------------------------------
 
     private static int computeCenteredLeft(InventoryScreen inv) {
         int screenW = inv.width;
         int invW = inv.getXSize();
-        int total = PANEL_W + 2 + invW;
-        return (screenW - total) / 2 + PANEL_W + 2;
+        int totalW = PANEL_W + 2 + invW;
+        return (screenW - totalW) / 2 + PANEL_W + 2;
     }
 
     private static int computePanelX(InventoryScreen inv) {
@@ -151,56 +220,58 @@ public final class CodexPanelClient {
     private static void setPanelChildBounds(InventoryScreen inv, State st) {
         int bgx = computePanelX(inv);
         int bgy = inv.getGuiTop();
+
         int px = bgx + 10;
         int py = bgy + 10;
         int pw = 127;
         int ph = PANEL_H - 20;
-        if (st.bg != null) st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
-        if (st.list != null) st.list.setBounds(px, py, pw, ph);
-        if (st.details != null) {
-            st.details.setBounds(px, py, pw, ph);
-            st.details.backButton().setPosition(px + 2, py + ph - st.details.backButton().getHeight() - 4);
-            st.details.completeButton().setPosition(px + (pw - st.details.completeButton().getWidth()) / 2, py + ph - st.details.completeButton().getHeight() - 4);
-            st.details.rejectButton().setPosition(px + pw - st.details.rejectButton().getWidth() - 2, py + ph - st.details.rejectButton().getHeight() - 4);
-        }
+
+        st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
+        st.list.setBounds(px, py, pw, ph);
+        st.details.setBounds(px, py, pw, ph);
+
+        st.details.backButton().setPosition(px + 2, py + ph - st.details.backButton().getHeight() - 4);
     }
 
     private static void reposition(InventoryScreen inv, State st) {
         if (st.btn != null) {
-            int x = inv.getGuiLeft() + 145;
-            int y = inv.getGuiTop() + 61;
-            st.btn.setPosition(x, y);
+            st.btn.setPosition(inv.getGuiLeft() + 145, inv.getGuiTop() + 61);
         }
         setPanelChildBounds(inv, st);
     }
 
+    // ---------------------------------------------------------------------
+    // Recipe book button hiding
+    // ---------------------------------------------------------------------
+
     private static void handleRecipeButtonRules(InventoryScreen inv, State st) {
         if (st.open) {
-            if (st.btn != null) st.btn.visible = true;
-            toggleRecipeButtonVisibility(inv, false);
+            toggleRecipeButtons(inv, false);
         } else if (isRecipePanelOpen(inv)) {
+            toggleRecipeButtons(inv, true);
             if (st.btn != null) st.btn.visible = false;
-            toggleRecipeButtonVisibility(inv, true);
         } else {
+            toggleRecipeButtons(inv, true);
             if (st.btn != null) st.btn.visible = true;
-            toggleRecipeButtonVisibility(inv, true);
         }
     }
 
-    private static void toggleRecipeButtonVisibility(InventoryScreen inv, boolean visible) {
+    private static void toggleRecipeButtons(InventoryScreen inv, boolean visible) {
         for (var child : inv.children()) {
             if (child instanceof ImageButton btn) {
-                if (btn.getWidth() == 20 && btn.getHeight() == 18) {
-                    btn.visible = visible;
-                }
+                if (btn.getWidth() == 20 && btn.getHeight() == 18) btn.visible = visible;
             }
         }
     }
 
     private static boolean isRecipePanelOpen(InventoryScreen inv) {
-        int centeredLeft = (inv.width - inv.getXSize()) / 2;
-        return inv.getGuiLeft() > centeredLeft + 10;
+        int mid = (inv.width - inv.getXSize()) / 2;
+        return inv.getGuiLeft() > mid + 10;
     }
+
+    // ---------------------------------------------------------------------
+    // Reflection helpers
+    // ---------------------------------------------------------------------
 
     private static Integer getLeft(InventoryScreen inv) {
         try {
@@ -219,91 +290,69 @@ public final class CodexPanelClient {
     }
 
     private static Field findLeftField(Class<?> c) throws NoSuchFieldException {
-        Class<?> cur = c;
-        while (cur != null) {
+        while (c != null) {
             try {
-                Field f = cur.getDeclaredField("leftPos");
+                Field f = c.getDeclaredField("leftPos");
                 f.setAccessible(true);
                 return f;
             } catch (NoSuchFieldException ignored) {
-                cur = cur.getSuperclass();
+                c = c.getSuperclass();
             }
         }
         throw new NoSuchFieldException("leftPos");
     }
 
-    private static void openDetails(State st, GuideData.Chapter chapter) {
-        if (st.details == null) return;
-        st.details.setChapter(chapter);
-        st.showingDetails = true;
-        updateVisibility(st);
-    }
+    // ---------------------------------------------------------------------
+    // Internal State
+    // ---------------------------------------------------------------------
 
-    private static void closeDetails(State st) {
-        st.showingDetails = false;
-        updateVisibility(st);
-    }
+    private static final class State {
+        final InventoryScreen inv;
 
-    private static void updateVisibility(State st) {
-        boolean listVisible = st.open && !st.showingDetails;
-        boolean detailsVisible = st.open && st.showingDetails;
-        if (st.bg != null) st.bg.visible = st.open;
-        if (st.list != null) {
-            st.list.visible = listVisible;
-            st.list.active = listVisible;
-        }
-        if (st.details != null) {
-            st.details.visible = detailsVisible;
-            st.details.active = detailsVisible;
-            st.details.backButton().visible = detailsVisible;
-            st.details.backButton().active = detailsVisible;
-            st.details.completeButton().visible = detailsVisible;
-            st.details.completeButton().active = detailsVisible;
-            st.details.rejectButton().visible = detailsVisible;
-            st.details.rejectButton().active = detailsVisible;
+        CodexToggleButton btn;
+        PanelBackground bg;
+        CodexListWidget list;
+        CodexDetailsPanel details;
+
+        boolean open = false;
+        boolean showingDetails = false;
+        boolean showingChapters = false;
+
+        GuideData.Category currentCategory;
+        Integer originalLeft;
+
+        State(InventoryScreen inv) {
+            this.inv = inv;
         }
     }
+
+    // ---------------------------------------------------------------------
+    // Background Widget
+    // ---------------------------------------------------------------------
 
     private static final class PanelBackground extends AbstractWidget {
+
         public PanelBackground(int x, int y, int w, int h) {
             super(x, y, w, h, Component.empty());
         }
 
         public void setBounds(int x, int y, int w, int h) {
-            this.setX(x);
-            this.setY(y);
-            this.width = w;
-            this.height = h;
+            setX(x);
+            setY(y);
+            width = w;
+            height = h;
         }
 
         @Override
-        protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+        protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float pt) {
             RenderSystem.disableBlend();
             gg.blit(PANEL_TEX, getX(), getY(), 0, 0, width, height, width, height);
         }
 
         @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            return false;
-        }
+        public boolean mouseClicked(double mx, double my, int b) { return false; }
 
         @Override
         protected void updateWidgetNarration(NarrationElementOutput n) {}
-    }
-
-    private static final class State {
-        final InventoryScreen inv;
-        CodexToggleButton btn;
-        PanelBackground bg;
-        CodexListWidget list;
-        CodexDetailsPanel details;
-        boolean showingDetails;
-        boolean open;
-        Integer originalLeft;
-        String selectedCategory = "all";
-
-        State(InventoryScreen inv) {
-            this.inv = inv;
-        }
     }
 }

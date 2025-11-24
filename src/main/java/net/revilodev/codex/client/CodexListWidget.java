@@ -12,7 +12,6 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.revilodev.codex.Config;
 import net.revilodev.codex.data.GuideData;
 
 import java.util.ArrayList;
@@ -21,35 +20,65 @@ import java.util.function.Consumer;
 
 @OnlyIn(Dist.CLIENT)
 public final class CodexListWidget extends AbstractWidget {
+
     private static final ResourceLocation ROW_TEX =
-            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/quest_widget.png");
-    private static final ResourceLocation ROW_TEX_DISABLED =
-            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/quest_widget_disabled.png");
+            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_widget.png");
 
     private final Minecraft mc;
-    private final List<GuideData.Chapter> chapters = new ArrayList<>();
-    private final Consumer<GuideData.Chapter> onClick;
+
+    private enum Mode { CATEGORIES, CHAPTERS }
+
+    private Mode mode = Mode.CATEGORIES;
+
+    private final List<ListEntry> entries = new ArrayList<>();
+
+    private final Consumer<GuideData.Category> onCategoryClick;
+    private final Consumer<GuideData.Chapter> onChapterClick;
 
     private float scrollY = 0f;
     private final int rowHeight = 27;
     private final int rowPad = 2;
 
-    private String category = "all";
+    private static sealed interface ListEntry permits CategoryEntry, ChapterEntry {}
 
-    public CodexListWidget(int x, int y, int width, int height, Consumer<GuideData.Chapter> onClick) {
-        super(x, y, width, height, Component.empty());
-        this.mc = Minecraft.getInstance();
-        this.onClick = onClick;
+    private static final class CategoryEntry implements ListEntry {
+        final GuideData.Category category;
+        CategoryEntry(GuideData.Category c) { this.category = c; }
     }
 
-    public void setChapters(Iterable<GuideData.Chapter> all) {
-        chapters.clear();
-        for (GuideData.Chapter c : all) chapters.add(c);
+    private static final class ChapterEntry implements ListEntry {
+        final GuideData.Chapter chapter;
+        ChapterEntry(GuideData.Chapter c) { this.chapter = c; }
+    }
+
+    public CodexListWidget(int x, int y, int width, int height,
+                           Consumer<GuideData.Category> onCategoryClick,
+                           Consumer<GuideData.Chapter> onChapterClick) {
+        super(x, y, width, height, Component.empty());
+        this.mc = Minecraft.getInstance();
+        this.onCategoryClick = onCategoryClick;
+        this.onChapterClick = onChapterClick;
+    }
+
+    // ------------------------------------------------------------
+    // Public API
+    // ------------------------------------------------------------
+
+    public void showCategories(Iterable<GuideData.Category> categories) {
+        entries.clear();
+        mode = Mode.CATEGORIES;
+        for (GuideData.Category c : categories) {
+            entries.add(new CategoryEntry(c));
+        }
         scrollY = 0f;
     }
 
-    public void setCategory(String categoryId) {
-        this.category = categoryId == null ? "all" : categoryId;
+    public void showChapters(Iterable<GuideData.Chapter> chapters) {
+        entries.clear();
+        mode = Mode.CHAPTERS;
+        for (GuideData.Chapter c : chapters) {
+            entries.add(new ChapterEntry(c));
+        }
         scrollY = 0f;
     }
 
@@ -60,75 +89,63 @@ public final class CodexListWidget extends AbstractWidget {
         this.height = h;
     }
 
-    private boolean categoryUnlocked(String catId) {
-        var c = GuideData.categoryById(catId).orElse(null);
-        if (mc.player == null) return true;
-        return GuideData.isCategoryUnlocked(c, mc.player);
-    }
-
-    private boolean includeInAll(GuideData.Chapter c) {
-        if (mc.player == null) return true;
-        return GuideData.includeChapterInAll(c, mc.player);
-    }
-
-    private boolean matchesCategory(GuideData.Chapter c) {
-        if (Config.disabledCategories().contains(c.category)) return false;
-        if ("all".equalsIgnoreCase(category)) return includeInAll(c);
-        if (!c.category.equalsIgnoreCase(category)) return false;
-        return categoryUnlocked(c.category);
-    }
+    // ------------------------------------------------------------
+    // Rendering
+    // ------------------------------------------------------------
 
     private int contentHeight() {
-        if (mc.player == null) return 0;
-        int visible = 0;
-        for (GuideData.Chapter c : chapters) {
-            if (!matchesCategory(c)) continue;
-            visible++;
-        }
-        return visible * (rowHeight + rowPad);
+        return entries.size() * (rowHeight + rowPad);
     }
 
     @Override
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!this.visible) return;
+
         RenderSystem.enableBlend();
         gg.enableScissor(getX(), getY(), getX() + width, getY() + height);
+
         int yOff = this.getY() - Mth.floor(scrollY);
         int drawn = 0;
 
-        for (GuideData.Chapter c : chapters) {
-            if (mc.player == null) continue;
-            if (!matchesCategory(c)) continue;
-
+        for (ListEntry le : entries) {
             int top = yOff + drawn * (rowHeight + rowPad);
             drawn++;
+
             if (top > this.getY() + this.height) break;
             if (top + rowHeight < this.getY()) continue;
 
-            boolean deps = true;
-            ResourceLocation rowTex = deps ? ROW_TEX : ROW_TEX_DISABLED;
-            gg.blit(rowTex, this.getX(), top, 0, 0, 127, 27, 127, 27);
+            gg.blit(ROW_TEX, this.getX(), top, 0, 0, 127, 27, 127, 27);
 
-            Item iconItem = c.iconItem().orElse(null);
+            Item iconItem = null;
+            String label = "";
+
+            if (le instanceof CategoryEntry ce) {
+                iconItem = ce.category.iconItem().orElse(null);
+                label = ce.category.name;
+            } else if (le instanceof ChapterEntry che) {
+                iconItem = che.chapter.iconItem().orElse(null);
+                label = che.chapter.name;
+            }
+
             if (iconItem != null) {
                 gg.renderItem(new ItemStack(iconItem), this.getX() + 6, top + 5);
             }
 
-            String name = c.name;
             int maxWidth = this.width - 42;
-            int nameWidth = mc.font.width(name);
-            int color = deps ? 0xFFFFFF : 0xA0A0A0;
+            int color = 0xFFFFFF;
 
+            int nameWidth = mc.font.width(label);
+            String toDraw = label;
             if (nameWidth > maxWidth) {
-                String trimmed = mc.font.plainSubstrByWidth(name, maxWidth - mc.font.width("...")) + "...";
-                gg.drawString(mc.font, trimmed, this.getX() + 30, top + 9, color, false);
-            } else {
-                gg.drawString(mc.font, name, this.getX() + 30, top + 9, color, false);
+                toDraw = mc.font.plainSubstrByWidth(label, maxWidth - mc.font.width("...")) + "...";
             }
+
+            gg.drawString(mc.font, toDraw, this.getX() + 30, top + 9, color, false);
         }
 
         gg.disableScissor();
 
+        // Scroll bar
         int content = contentHeight();
         if (content > this.height) {
             float ratio = (float) this.height / content;
@@ -137,6 +154,10 @@ public final class CodexListWidget extends AbstractWidget {
             gg.fill(getX() + width + 4, barY, getX() + width + 6, barY + barHeight, 0xFF808080);
         }
     }
+
+    // ------------------------------------------------------------
+    // Input
+    // ------------------------------------------------------------
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
         if (!this.visible || !this.active) return false;
@@ -148,29 +169,33 @@ public final class CodexListWidget extends AbstractWidget {
         return true;
     }
 
+    @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         return mouseScrolled(mouseX, mouseY, deltaY);
     }
 
+    @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!this.visible || !this.active || !this.isMouseOver(mouseX, mouseY)) return false;
         if (button != 0) return false;
-        if (mc.player == null) return false;
+
         int localY = (int) (mouseY - this.getY() + scrollY);
         int idx = localY / (rowHeight + rowPad);
-        int visibleIndex = 0;
+        if (idx < 0 || idx >= entries.size()) return false;
 
-        for (GuideData.Chapter c : chapters) {
-            if (!matchesCategory(c)) continue;
-            if (visibleIndex == idx) {
-                if (onClick != null) onClick.accept(c);
-                return true;
-            }
-            visibleIndex++;
+        ListEntry le = entries.get(idx);
+        if (le instanceof CategoryEntry ce) {
+            if (onCategoryClick != null) onCategoryClick.accept(ce.category);
+            return true;
+        } else if (le instanceof ChapterEntry che) {
+            if (onChapterClick != null) onChapterClick.accept(che.chapter);
+            return true;
         }
+
         return false;
     }
 
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput narration) {}
+    protected void updateWidgetNarration(NarrationElementOutput narration) {
+    }
 }
