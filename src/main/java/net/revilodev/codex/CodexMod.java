@@ -23,14 +23,24 @@ public final class CodexMod {
 
     public CodexMod(ModContainer modContainer, IEventBus modBus) {
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC, MOD_ID + "-common.toml");
+
+        // Register items
         ModItems.register(modBus);
+
+        // Lifecycle events
         modBus.addListener(this::commonSetup);
         modBus.addListener(this::addCreative);
+
+        // Client-only setup
         if (net.neoforged.fml.loading.FMLEnvironment.dist == Dist.CLIENT) {
             modBus.addListener(this::clientSetup);
         }
+
+        // Network
         CodexNetwork.bootstrap(modBus);
-        NeoForge.EVENT_BUS.register(this);
+
+        // ❌ MUST NOT REGISTER THE MOD CLASS HERE
+        // NeoForge.EVENT_BUS.register(this);  <-- removed
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
@@ -50,6 +60,4 @@ public final class CodexMod {
             event.accept(ModItems.GUIDE_BOOK.get());
         }
     }
-
-
 }

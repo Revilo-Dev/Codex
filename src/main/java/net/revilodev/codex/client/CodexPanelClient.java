@@ -13,7 +13,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.event.ScreenEvent;
-import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.data.GuideData;
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -22,15 +22,15 @@ import java.util.WeakHashMap;
 @OnlyIn(Dist.CLIENT)
 public final class CodexPanelClient {
     private static final ResourceLocation BTN_TEX =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_button.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_button.png");
     private static final ResourceLocation BTN_TEX_HOVER =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_button_hovered.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_button_hovered.png");
     private static final ResourceLocation BTN_TEX_TOAST =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_book_toast.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_toast.png");
     private static final ResourceLocation BTN_TEX_TOAST_HOVER =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_book_toast_highlighted.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/book_toast_highlighted.png");
     private static final ResourceLocation PANEL_TEX =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/quest_panel.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/panel.png");
     private static final int PANEL_W = 147;
     private static final int PANEL_H = 166;
     private static final Map<Screen, State> STATES = new WeakHashMap<>();
@@ -42,17 +42,17 @@ public final class CodexPanelClient {
     public static void onScreenInit(ScreenEvent.Init.Post e) {
         Screen s = e.getScreen();
         if (!(s instanceof InventoryScreen inv)) return;
-        QuestData.loadClient(false);
+        GuideData.loadClient(false);
         State st = new State(inv);
         STATES.put(s, st);
-        int btnX = inv.getGuiLeft() + 125;
+        int btnX = inv.getGuiLeft() + 145;
         int btnY = inv.getGuiTop() + 61;
         CodexToggleButton btn = new CodexToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
         st.btn = btn;
         st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H);
         e.addListener(st.bg);
-        st.list = new CodexListWidget(0, 0, 127, PANEL_H - 20, q -> openDetails(st, q));
-        st.list.setQuests(QuestData.all());
+        st.list = new CodexListWidget(0, 0, 127, PANEL_H - 20, c -> openDetails(st, c));
+        st.list.setChapters(GuideData.all());
         st.list.setCategory(st.selectedCategory);
         e.addListener(st.list);
         st.details = new CodexDetailsPanel(0, 0, 127, PANEL_H - 20, () -> closeDetails(st));
@@ -60,13 +60,6 @@ public final class CodexPanelClient {
         e.addListener(st.details.backButton());
         e.addListener(st.details.completeButton());
         e.addListener(st.details.rejectButton());
-        st.tabs = new CategoryTabsWidget(0, 0, 26, PANEL_H, id -> {
-            st.selectedCategory = id;
-            if (st.list != null) st.list.setCategory(id);
-        });
-        st.tabs.setCategories(QuestData.categoriesOrdered());
-        st.tabs.setSelected(st.selectedCategory);
-        e.addListener(st.tabs);
         e.addListener(btn);
         reposition(inv, st);
         if (lastQuestOpen) {
@@ -102,8 +95,7 @@ public final class CodexPanelClient {
         handleRecipeButtonRules(inv, st);
     }
 
-    public static void onScreenRenderPost(ScreenEvent.Render.Post e) {
-    }
+    public static void onScreenRenderPost(ScreenEvent.Render.Post e) {}
 
     public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre e) {
         Screen s = e.getScreen();
@@ -156,10 +148,6 @@ public final class CodexPanelClient {
         return inv.getGuiLeft() - PANEL_W - 2;
     }
 
-    private static int computeTabsX(InventoryScreen inv) {
-        return computePanelX(inv) - 23;
-    }
-
     private static void setPanelChildBounds(InventoryScreen inv, State st) {
         int bgx = computePanelX(inv);
         int bgy = inv.getGuiTop();
@@ -175,12 +163,11 @@ public final class CodexPanelClient {
             st.details.completeButton().setPosition(px + (pw - st.details.completeButton().getWidth()) / 2, py + ph - st.details.completeButton().getHeight() - 4);
             st.details.rejectButton().setPosition(px + pw - st.details.rejectButton().getWidth() - 2, py + ph - st.details.rejectButton().getHeight() - 4);
         }
-        if (st.tabs != null) st.tabs.setBounds(computeTabsX(inv), bgy + 4, 26, PANEL_H - 8);
     }
 
     private static void reposition(InventoryScreen inv, State st) {
         if (st.btn != null) {
-            int x = inv.getGuiLeft() + 125;
+            int x = inv.getGuiLeft() + 145;
             int y = inv.getGuiTop() + 61;
             st.btn.setPosition(x, y);
         }
@@ -228,8 +215,7 @@ public final class CodexPanelClient {
         try {
             if (LEFT_FIELD == null) LEFT_FIELD = findLeftField(inv.getClass());
             LEFT_FIELD.setInt(inv, v);
-        } catch (Throwable ignored) {
-        }
+        } catch (Throwable ignored) {}
     }
 
     private static Field findLeftField(Class<?> c) throws NoSuchFieldException {
@@ -246,9 +232,9 @@ public final class CodexPanelClient {
         throw new NoSuchFieldException("leftPos");
     }
 
-    private static void openDetails(State st, QuestData.Quest quest) {
+    private static void openDetails(State st, GuideData.Chapter chapter) {
         if (st.details == null) return;
-        st.details.setQuest(quest);
+        st.details.setChapter(chapter);
         st.showingDetails = true;
         updateVisibility(st);
     }
@@ -276,10 +262,6 @@ public final class CodexPanelClient {
             st.details.rejectButton().visible = detailsVisible;
             st.details.rejectButton().active = detailsVisible;
         }
-        if (st.tabs != null) {
-            st.tabs.visible = st.open;
-            st.tabs.active = st.open;
-        }
     }
 
     private static final class PanelBackground extends AbstractWidget {
@@ -306,8 +288,7 @@ public final class CodexPanelClient {
         }
 
         @Override
-        protected void updateWidgetNarration(NarrationElementOutput n) {
-        }
+        protected void updateWidgetNarration(NarrationElementOutput n) {}
     }
 
     private static final class State {
@@ -316,7 +297,6 @@ public final class CodexPanelClient {
         PanelBackground bg;
         CodexListWidget list;
         CodexDetailsPanel details;
-        CategoryTabsWidget tabs;
         boolean showingDetails;
         boolean open;
         Integer originalLeft;

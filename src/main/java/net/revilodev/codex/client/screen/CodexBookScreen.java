@@ -6,16 +6,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.revilodev.codex.client.CategoryTabsWidget;
 import net.revilodev.codex.client.CodexDetailsPanel;
 import net.revilodev.codex.client.CodexListWidget;
-import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.data.GuideData;
 
 @OnlyIn(Dist.CLIENT)
 public final class CodexBookScreen extends Screen {
 
     private static final ResourceLocation PANEL_TEX =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/quest_panel.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/panel.png");
 
     private int panelWidth = 147;
     private int panelHeight = 166;
@@ -24,7 +23,6 @@ public final class CodexBookScreen extends Screen {
     private int rightX;
     private int topY;
 
-    private CategoryTabsWidget tabs;
     private CodexListWidget list;
     private CodexDetailsPanel details;
 
@@ -49,20 +47,12 @@ public final class CodexBookScreen extends Screen {
         int pw = 127;
         int ph = panelHeight - 20;
 
-        tabs = new CategoryTabsWidget(leftX - 23, topY + 4, 26, panelHeight - 8, id -> {
-            list.setCategory(id);
-            showingDetails = false;
-            updateVisibility();
-        });
-        tabs.setCategories(QuestData.categoriesOrdered());
-        tabs.setSelected("all");
-
-        list = new CodexListWidget(pxLeft, py, pw, ph, q -> {
-            details.setQuest(q);
+        list = new CodexListWidget(pxLeft, py, pw, ph, chapter -> {
+            details.setChapter(chapter);
             showingDetails = true;
             updateVisibility();
         });
-        list.setQuests(QuestData.all());
+        list.setChapters(GuideData.all());
         list.setCategory("all");
 
         details = new CodexDetailsPanel(pxRight, py, pw, ph, () -> {
@@ -72,7 +62,6 @@ public final class CodexBookScreen extends Screen {
 
         details.setBounds(pxRight, py, pw, ph);
 
-        addRenderableWidget(tabs);
         addRenderableWidget(list);
         addRenderableWidget(details);
         addRenderableWidget(details.backButton());
@@ -97,15 +86,10 @@ public final class CodexBookScreen extends Screen {
 
         details.rejectButton().visible = showingDetails;
         details.rejectButton().active = showingDetails;
-
-        tabs.visible = true;
-        tabs.active = true;
     }
 
     @Override
-    public void renderBackground(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
-        // disable vanilla background entirely
-    }
+    public void renderBackground(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {}
 
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {

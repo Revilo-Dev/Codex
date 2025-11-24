@@ -10,7 +10,7 @@ public final class ModItems {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(CodexMod.MOD_ID);
 
     public static final DeferredItem<Item> GUIDE_BOOK =
-            ITEMS.registerItem("guid_book", GuidBookItem::new, new Item.Properties().stacksTo(1));
+            ITEMS.registerItem("guide_book", GuidBookItem::new, new Item.Properties().stacksTo(1));
 
     public static void register(IEventBus bus) {
         ITEMS.register(bus);

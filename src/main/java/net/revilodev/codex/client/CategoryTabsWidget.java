@@ -10,7 +10,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.Config;
-import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.data.GuideData;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,13 +19,13 @@ import java.util.function.Consumer;
 @OnlyIn(Dist.CLIENT)
 public final class CategoryTabsWidget extends AbstractWidget {
     private static final ResourceLocation TAB =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/tab.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/tab.png");
     private static final ResourceLocation TAB_SELECTED =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/tab_selected.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/tab_selected.png");
 
     private final Minecraft mc = Minecraft.getInstance();
     private final Consumer<String> onSelect;
-    private final List<QuestData.Category> categories = new ArrayList<>();
+    private final List<GuideData.Category> categories = new ArrayList<>();
     private String selected = "all";
 
     private int cellW = 26;
@@ -45,10 +45,10 @@ public final class CategoryTabsWidget extends AbstractWidget {
         this.height = h;
     }
 
-    public void setCategories(List<QuestData.Category> list) {
+    public void setCategories(List<GuideData.Category> list) {
         categories.clear();
         int count = 0;
-        for (QuestData.Category c : list) {
+        for (GuideData.Category c : list) {
             if (Config.disabledCategories().contains(c.id)) continue;
             categories.add(c);
             count++;
@@ -66,7 +66,7 @@ public final class CategoryTabsWidget extends AbstractWidget {
         int x = getX();
         int y = getY();
         int i = 0;
-        for (QuestData.Category c : categories) {
+        for (GuideData.Category c : categories) {
             int top = y + i * (cellH + gap);
             boolean sel = c.id.equalsIgnoreCase(selected);
             ResourceLocation tex = sel ? TAB_SELECTED : TAB;

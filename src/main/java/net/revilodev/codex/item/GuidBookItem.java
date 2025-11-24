@@ -20,10 +20,9 @@ public class GuidBookItem extends Item {
 
         // SERVER side → tell client to open screen
         if (!level.isClientSide && player instanceof ServerPlayer sp) {
-            CodexNetwork.sendOpenQuestBook(sp);
+            CodexNetwork.sendOpenCodexBook(sp);
         }
 
-        // return normally
         return InteractionResultHolder.sidedSuccess(player.getItemInHand(hand), level.isClientSide);
     }
 }

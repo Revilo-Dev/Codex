@@ -13,7 +13,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.Config;
-import net.revilodev.codex.quest.QuestData;
+import net.revilodev.codex.data.GuideData;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,13 +22,13 @@ import java.util.function.Consumer;
 @OnlyIn(Dist.CLIENT)
 public final class CodexListWidget extends AbstractWidget {
     private static final ResourceLocation ROW_TEX =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_widget.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/quest_widget.png");
     private static final ResourceLocation ROW_TEX_DISABLED =
-            ResourceLocation.fromNamespaceAndPath("boundless", "textures/gui/sprites/quest_widget_disabled.png");
+            ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/quest_widget_disabled.png");
 
     private final Minecraft mc;
-    private final List<QuestData.Quest> quests = new ArrayList<>();
-    private final Consumer<QuestData.Quest> onClick;
+    private final List<GuideData.Chapter> chapters = new ArrayList<>();
+    private final Consumer<GuideData.Chapter> onClick;
 
     private float scrollY = 0f;
     private final int rowHeight = 27;
@@ -36,15 +36,15 @@ public final class CodexListWidget extends AbstractWidget {
 
     private String category = "all";
 
-    public CodexListWidget(int x, int y, int width, int height, Consumer<QuestData.Quest> onClick) {
+    public CodexListWidget(int x, int y, int width, int height, Consumer<GuideData.Chapter> onClick) {
         super(x, y, width, height, Component.empty());
         this.mc = Minecraft.getInstance();
         this.onClick = onClick;
     }
 
-    public void setQuests(Iterable<QuestData.Quest> all) {
-        quests.clear();
-        for (QuestData.Quest q : all) quests.add(q);
+    public void setChapters(Iterable<GuideData.Chapter> all) {
+        chapters.clear();
+        for (GuideData.Chapter c : all) chapters.add(c);
         scrollY = 0f;
     }
 
@@ -61,33 +61,34 @@ public final class CodexListWidget extends AbstractWidget {
     }
 
     private boolean categoryUnlocked(String catId) {
-        var c = QuestData.categoryById(catId).orElse(null);
+        var c = GuideData.categoryById(catId).orElse(null);
         if (mc.player == null) return true;
-        return QuestData.isCategoryUnlocked(c, mc.player);
+        return GuideData.isCategoryUnlocked(c, mc.player);
     }
 
-    private boolean includeInAll(QuestData.Quest q) {
+    private boolean includeInAll(GuideData.Chapter c) {
         if (mc.player == null) return true;
-        return QuestData.includeQuestInAll(q, mc.player);
+        return GuideData.includeChapterInAll(c, mc.player);
     }
 
-    private boolean matchesCategory(QuestData.Quest q) {
-        if (Config.disabledCategories().contains(q.category)) return false;
-        if ("all".equalsIgnoreCase(category)) return includeInAll(q);
-        if (!q.category.equalsIgnoreCase(category)) return false;
-        return categoryUnlocked(q.category);
+    private boolean matchesCategory(GuideData.Chapter c) {
+        if (Config.disabledCategories().contains(c.category)) return false;
+        if ("all".equalsIgnoreCase(category)) return includeInAll(c);
+        if (!c.category.equalsIgnoreCase(category)) return false;
+        return categoryUnlocked(c.category);
     }
 
     private int contentHeight() {
         if (mc.player == null) return 0;
         int visible = 0;
-        for (QuestData.Quest q : quests) {
-            if (!matchesCategory(q)) continue;
+        for (GuideData.Chapter c : chapters) {
+            if (!matchesCategory(c)) continue;
             visible++;
         }
         return visible * (rowHeight + rowPad);
     }
 
+    @Override
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!this.visible) return;
         RenderSystem.enableBlend();
@@ -95,9 +96,9 @@ public final class CodexListWidget extends AbstractWidget {
         int yOff = this.getY() - Mth.floor(scrollY);
         int drawn = 0;
 
-        for (QuestData.Quest q : quests) {
+        for (GuideData.Chapter c : chapters) {
             if (mc.player == null) continue;
-            if (!matchesCategory(q)) continue;
+            if (!matchesCategory(c)) continue;
 
             int top = yOff + drawn * (rowHeight + rowPad);
             drawn++;
@@ -108,12 +109,12 @@ public final class CodexListWidget extends AbstractWidget {
             ResourceLocation rowTex = deps ? ROW_TEX : ROW_TEX_DISABLED;
             gg.blit(rowTex, this.getX(), top, 0, 0, 127, 27, 127, 27);
 
-            Item iconItem = q.iconItem().orElse(null);
+            Item iconItem = c.iconItem().orElse(null);
             if (iconItem != null) {
                 gg.renderItem(new ItemStack(iconItem), this.getX() + 6, top + 5);
             }
 
-            String name = q.name;
+            String name = c.name;
             int maxWidth = this.width - 42;
             int nameWidth = mc.font.width(name);
             int color = deps ? 0xFFFFFF : 0xA0A0A0;
@@ -159,10 +160,10 @@ public final class CodexListWidget extends AbstractWidget {
         int idx = localY / (rowHeight + rowPad);
         int visibleIndex = 0;
 
-        for (QuestData.Quest q : quests) {
-            if (!matchesCategory(q)) continue;
+        for (GuideData.Chapter c : chapters) {
+            if (!matchesCategory(c)) continue;
             if (visibleIndex == idx) {
-                if (onClick != null) onClick.accept(q);
+                if (onClick != null) onClick.accept(c);
                 return true;
             }
             visibleIndex++;
@@ -171,6 +172,5 @@ public final class CodexListWidget extends AbstractWidget {
     }
 
     @Override
-    protected void updateWidgetNarration(NarrationElementOutput narration) {
-    }
+    protected void updateWidgetNarration(NarrationElementOutput narration) {}
 }
