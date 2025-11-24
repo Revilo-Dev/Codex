@@ -17,7 +17,6 @@ import net.revilodev.codex.data.GuideData;
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.WeakHashMap;
-import java.util.List;
 
 @OnlyIn(Dist.CLIENT)
 public final class CodexPanelClient {
@@ -53,25 +52,28 @@ public final class CodexPanelClient {
         STATES.put(s, st);
 
         // Toggle button
-        int btnX = inv.getGuiLeft() + 145;
-        int btnY = inv.getGuiTop() + 61;
-        st.btn = new CodexToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
+        st.btn = new CodexToggleButton(
+                inv.getGuiLeft() + 145,
+                inv.getGuiTop() + 61,
+                BTN_TEX, BTN_TEX_HOVER,
+                () -> toggle(st)
+        );
         e.addListener(st.btn);
 
         // Background
         st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H);
         e.addListener(st.bg);
 
-        // CATEGORY + CHAPTER LIST
+        // List
         st.list = new CodexListWidget(
                 0, 0, 127, PANEL_H - 20,
-                category -> openCategory(st, category),
-                chapter -> openDetails(st, chapter)
+                cat -> openCategory(st, cat),
+                ch -> openDetails(st, ch)
         );
         st.list.showCategories(GuideData.allCategories());
         e.addListener(st.list);
 
-        // DETAILS PANEL
+        // Details
         st.details = new CodexDetailsPanel(0, 0, 127, PANEL_H - 20, () -> closeDetails(st));
         e.addListener(st.details);
         e.addListener(st.details.backButton());
@@ -94,7 +96,7 @@ public final class CodexPanelClient {
     }
 
     // ---------------------------------------------------------------------
-    // Render
+    // Render Events
     // ---------------------------------------------------------------------
 
     public static void onScreenRenderPre(ScreenEvent.Render.Pre e) {
@@ -102,43 +104,43 @@ public final class CodexPanelClient {
         State st = STATES.get(s);
         if (st == null || !(s instanceof InventoryScreen inv)) return;
 
-        if (st.btn != null) st.btn.setTextures(BTN_TEX, BTN_TEX_HOVER);
+        st.btn.setTextures(BTN_TEX, BTN_TEX_HOVER);
 
-        if (st.open) setLeft(inv, computeCenteredLeft(inv));
+        if (st.open)
+            setLeft(inv, computeCenteredLeft(inv));
 
         reposition(inv, st);
         updateVisibility(st);
-        handleRecipeButtonRules(inv, st);
+
+        handleRecipeBook(inv, st);
     }
 
     public static void onScreenRenderPost(ScreenEvent.Render.Post e) {}
 
     public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre e) {
-        Screen s = e.getScreen();
-        State st = STATES.get(s);
-        if (st == null || !(s instanceof InventoryScreen inv)) return;
+        State st = STATES.get(e.getScreen());
+        if (st == null || !(st.inv instanceof InventoryScreen inv)) return;
         if (!st.open) return;
+
+        double mx = e.getMouseX();
+        double my = e.getMouseY();
+        double dy = e.getScrollDeltaY();
 
         int px = computePanelX(inv) + 10;
         int py = inv.getGuiTop() + 10;
         int pw = 127;
         int ph = PANEL_H - 20;
 
-        double mx = e.getMouseX();
-        double my = e.getMouseY();
-        double dy = e.getScrollDeltaY();
-
         boolean used = false;
 
-        if (st.list.visible) {
-            if (mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
-                used = st.list.mouseScrolled(mx, my, dy) || st.list.mouseScrolled(mx, my, 0.0, dy);
-            }
+        if (st.list.visible &&
+                mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
+            used = st.list.mouseScrolled(mx, my, dy);
         }
-        if (st.details.visible) {
-            if (mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
-                used = st.details.mouseScrolled(mx, my, dy) || st.details.mouseScrolled(mx, my, 0.0, dy) || used;
-            }
+
+        if (st.details.visible &&
+                mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
+            used = st.details.mouseScrolled(mx, my, dy) || used;
         }
 
         if (used) e.setCanceled(true);
@@ -153,10 +155,12 @@ public final class CodexPanelClient {
         LAST_OPEN = st.open;
 
         if (st.open) {
-            if (st.originalLeft == null) st.originalLeft = getLeft(st.inv);
+            if (st.originalLeft == null)
+                st.originalLeft = getLeft(st.inv);
             setLeft(st.inv, computeCenteredLeft(st.inv));
-        } else if (st.originalLeft != null) {
-            setLeft(st.inv, st.originalLeft);
+        } else {
+            if (st.originalLeft != null)
+                setLeft(st.inv, st.originalLeft);
         }
 
         updateVisibility(st);
@@ -169,8 +173,8 @@ public final class CodexPanelClient {
         updateVisibility(st);
     }
 
-    private static void openDetails(State st, GuideData.Chapter chapter) {
-        st.details.setChapter(chapter);
+    private static void openDetails(State st, GuideData.Chapter ch) {
+        st.details.setChapter(ch);
         st.showingDetails = true;
         updateVisibility(st);
     }
@@ -178,7 +182,6 @@ public final class CodexPanelClient {
     private static void closeDetails(State st) {
         st.showingDetails = false;
 
-        // Return to chapters list
         if (st.currentCategory != null) {
             st.list.showChapters(GuideData.chaptersInCategory(st.currentCategory.id));
             st.showingChapters = true;
@@ -203,21 +206,66 @@ public final class CodexPanelClient {
     }
 
     // ---------------------------------------------------------------------
+    // Recipe book control (non-destructive)
+    // ---------------------------------------------------------------------
+
+    private static void handleRecipeBook(InventoryScreen inv, State st) {
+
+        // If Codex panel is open → hide recipe book button + book panel
+        if (st.open) {
+
+            for (var child : inv.children()) {
+
+                // Hide the recipe button (20x18 is the known size)
+                if (child instanceof ImageButton btn &&
+                        btn.getWidth() == 20 && btn.getHeight() == 18) {
+                    btn.visible = false;
+                }
+
+                // Hide the recipe book GUI panel (the book sprite)
+                if (child.getClass().getName().contains("RecipeBookComponent")) {
+                    try {
+                        child.getClass().getMethod("setVisible", boolean.class).invoke(child, false);
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            return;
+        }
+
+        // Codex closed → show recipe UI normally
+        for (var child : inv.children()) {
+
+            if (child instanceof ImageButton btn &&
+                    btn.getWidth() == 20 && btn.getHeight() == 18) {
+                btn.visible = true;
+            }
+
+            if (child.getClass().getName().contains("RecipeBookComponent")) {
+                try {
+                    child.getClass().getMethod("setVisible", boolean.class).invoke(child, true);
+                } catch (Exception ignored) {}
+            }
+        }
+    }
+
+
+    // ---------------------------------------------------------------------
     // Layout
     // ---------------------------------------------------------------------
 
     private static int computeCenteredLeft(InventoryScreen inv) {
-        int screenW = inv.width;
-        int invW = inv.getXSize();
-        int totalW = PANEL_W + 2 + invW;
-        return (screenW - totalW) / 2 + PANEL_W + 2;
+        return (inv.width - (PANEL_W + 2 + inv.getXSize())) / 2 + PANEL_W + 2;
     }
 
     private static int computePanelX(InventoryScreen inv) {
         return inv.getGuiLeft() - PANEL_W - 2;
     }
 
-    private static void setPanelChildBounds(InventoryScreen inv, State st) {
+    private static void reposition(InventoryScreen inv, State st) {
+        st.btn.setX(inv.getGuiLeft() + 145);
+        st.btn.setY(inv.getGuiTop() + 61);
+
         int bgx = computePanelX(inv);
         int bgy = inv.getGuiTop();
 
@@ -230,43 +278,8 @@ public final class CodexPanelClient {
         st.list.setBounds(px, py, pw, ph);
         st.details.setBounds(px, py, pw, ph);
 
-        st.details.backButton().setPosition(px + 2, py + ph - st.details.backButton().getHeight() - 4);
-    }
-
-    private static void reposition(InventoryScreen inv, State st) {
-        if (st.btn != null) {
-            st.btn.setPosition(inv.getGuiLeft() + 145, inv.getGuiTop() + 61);
-        }
-        setPanelChildBounds(inv, st);
-    }
-
-    // ---------------------------------------------------------------------
-    // Recipe book button hiding
-    // ---------------------------------------------------------------------
-
-    private static void handleRecipeButtonRules(InventoryScreen inv, State st) {
-        if (st.open) {
-            toggleRecipeButtons(inv, false);
-        } else if (isRecipePanelOpen(inv)) {
-            toggleRecipeButtons(inv, true);
-            if (st.btn != null) st.btn.visible = false;
-        } else {
-            toggleRecipeButtons(inv, true);
-            if (st.btn != null) st.btn.visible = true;
-        }
-    }
-
-    private static void toggleRecipeButtons(InventoryScreen inv, boolean visible) {
-        for (var child : inv.children()) {
-            if (child instanceof ImageButton btn) {
-                if (btn.getWidth() == 20 && btn.getHeight() == 18) btn.visible = visible;
-            }
-        }
-    }
-
-    private static boolean isRecipePanelOpen(InventoryScreen inv) {
-        int mid = (inv.width - inv.getXSize()) / 2;
-        return inv.getGuiLeft() > mid + 10;
+        st.details.backButton().setPosition(px + 2,
+                py + ph - st.details.backButton().getHeight() - 4);
     }
 
     // ---------------------------------------------------------------------
@@ -275,16 +288,18 @@ public final class CodexPanelClient {
 
     private static Integer getLeft(InventoryScreen inv) {
         try {
-            if (LEFT_FIELD == null) LEFT_FIELD = findLeftField(inv.getClass());
+            if (LEFT_FIELD == null)
+                LEFT_FIELD = findLeftField(inv.getClass());
             return (Integer) LEFT_FIELD.get(inv);
-        } catch (Throwable t) {
+        } catch (Throwable ignored) {
             return inv.getGuiLeft();
         }
     }
 
     private static void setLeft(InventoryScreen inv, int v) {
         try {
-            if (LEFT_FIELD == null) LEFT_FIELD = findLeftField(inv.getClass());
+            if (LEFT_FIELD == null)
+                LEFT_FIELD = findLeftField(inv.getClass());
             LEFT_FIELD.setInt(inv, v);
         } catch (Throwable ignored) {}
     }
@@ -318,8 +333,8 @@ public final class CodexPanelClient {
         boolean showingDetails = false;
         boolean showingChapters = false;
 
-        GuideData.Category currentCategory;
-        Integer originalLeft;
+        GuideData.Category currentCategory = null;
+        Integer originalLeft = null;
 
         State(InventoryScreen inv) {
             this.inv = inv;
@@ -327,7 +342,7 @@ public final class CodexPanelClient {
     }
 
     // ---------------------------------------------------------------------
-    // Background Widget
+    // Panel Background
     // ---------------------------------------------------------------------
 
     private static final class PanelBackground extends AbstractWidget {
@@ -337,10 +352,10 @@ public final class CodexPanelClient {
         }
 
         public void setBounds(int x, int y, int w, int h) {
-            setX(x);
-            setY(y);
-            width = w;
-            height = h;
+            this.setX(x);
+            this.setY(y);
+            this.width = w;
+            this.height = h;
         }
 
         @Override

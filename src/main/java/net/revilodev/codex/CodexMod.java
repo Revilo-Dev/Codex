@@ -36,11 +36,7 @@ public final class CodexMod {
             modBus.addListener(this::clientSetup);
         }
 
-        // Network
-        CodexNetwork.bootstrap(modBus);
 
-        // ❌ MUST NOT REGISTER THE MOD CLASS HERE
-        // NeoForge.EVENT_BUS.register(this);  <-- removed
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
