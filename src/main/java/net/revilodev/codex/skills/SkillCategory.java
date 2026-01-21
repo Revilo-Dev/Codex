@@ -1,0 +1,28 @@
+package net.revilodev.codex.skills;
+
+import net.minecraft.resources.ResourceLocation;
+
+import java.util.Locale;
+
+public enum SkillCategory {
+    COMBAT("combat", "Combat", ResourceLocation.parse("minecraft:iron_sword")),
+    SURVIVAL("survival", "Survival", ResourceLocation.parse("minecraft:heart_of_the_sea")),
+    UTILITY("utility", "Utility", ResourceLocation.parse("minecraft:iron_pickaxe"));
+
+    public final String id;
+    public final String title;
+    public final ResourceLocation icon;
+
+    SkillCategory(String id, String title, ResourceLocation icon) {
+        this.id = id;
+        this.title = title;
+        this.icon = icon;
+    }
+
+    public static SkillCategory byId(String id) {
+        if (id == null) return COMBAT;
+        String s = id.toLowerCase(Locale.ROOT);
+        for (SkillCategory c : values()) if (c.id.equals(s)) return c;
+        return COMBAT;
+    }
+}

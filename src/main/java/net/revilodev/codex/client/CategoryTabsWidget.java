@@ -1,3 +1,4 @@
+// src/main/java/net/revilodev/codex/client/CategoryTabsWidget.java
 package net.revilodev.codex.client;
 
 import net.minecraft.client.Minecraft;
@@ -9,8 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
-import net.revilodev.codex.Config;
-import net.revilodev.codex.data.GuideData;
+import net.revilodev.codex.skills.SkillRegistry;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,15 +23,20 @@ public final class CategoryTabsWidget extends AbstractWidget {
     private static final ResourceLocation TAB_SELECTED =
             ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/tab_selected.png");
 
+    private static final int MAX_TABS = 5;
+
     private final Minecraft mc = Minecraft.getInstance();
     private final Consumer<String> onSelect;
-    private final List<GuideData.Category> categories = new ArrayList<>();
-    private String selected = "all";
+    private final List<SkillRegistry.Category> categories = new ArrayList<>();
+    private String selected = "";
 
     private int cellW = 26;
     private int cellH = 26;
     private int gap = 2;
-    private static final int MAX_TABS = 5;
+
+    private Component pendingTooltip;
+    private int pendingTooltipX;
+    private int pendingTooltipY;
 
     public CategoryTabsWidget(int x, int y, int w, int h, Consumer<String> onSelect) {
         super(x, y, w, h, Component.empty());
@@ -45,37 +50,72 @@ public final class CategoryTabsWidget extends AbstractWidget {
         this.height = h;
     }
 
-    public void setCategories(List<GuideData.Category> list) {
+    public void setCategories(List<SkillRegistry.Category> list) {
         categories.clear();
         int count = 0;
-        for (GuideData.Category c : list) {
-            if (Config.disabledCategories().contains(c.id)) continue;
+        for (SkillRegistry.Category c : list) {
+            if (c == null) continue;
+            if ("all".equalsIgnoreCase(c.id())) continue;
             categories.add(c);
             count++;
             if (count >= MAX_TABS) break;
         }
+
+        if (!categories.isEmpty()) {
+            boolean hasSelected = false;
+            for (SkillRegistry.Category c : categories) {
+                if (c.id().equalsIgnoreCase(selected)) {
+                    hasSelected = true;
+                    break;
+                }
+            }
+            if (!hasSelected) selected = categories.get(0).id();
+        } else {
+            selected = "";
+        }
     }
 
     public void setSelected(String id) {
-        this.selected = id == null ? "all" : id;
+        this.selected = id == null ? "" : id;
+    }
+
+    public void renderHoverTooltipOnTop(GuiGraphics gg) {
+        if (pendingTooltip == null) return;
+
+        gg.pose().pushPose();
+        gg.pose().translate(0.0F, 0.0F, 500.0F);
+        gg.renderTooltip(mc.font, pendingTooltip, pendingTooltipX, pendingTooltipY);
+        gg.pose().popPose();
+
+        pendingTooltip = null;
     }
 
     @Override
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible) return;
+
+        pendingTooltip = null;
+
         int x = getX();
         int y = getY();
-        int i = 0;
-        for (GuideData.Category c : categories) {
+
+        for (int i = 0; i < Math.min(categories.size(), MAX_TABS); i++) {
+            SkillRegistry.Category c = categories.get(i);
             int top = y + i * (cellH + gap);
-            boolean sel = c.id.equalsIgnoreCase(selected);
+
+            boolean sel = !selected.isBlank() && c.id().equalsIgnoreCase(selected);
             ResourceLocation tex = sel ? TAB_SELECTED : TAB;
+
             gg.blit(tex, x, top, 0, 0, cellW, cellH, cellW, cellH);
-            c.iconItem().ifPresent(it -> gg.renderItem(new ItemStack(it), x + 5, top + 5));
+            gg.renderItem(new ItemStack(net.minecraft.core.registries.BuiltInRegistries.ITEM.getOptional(ResourceLocation.parse(c.iconItem().toString())).orElse(net.minecraft.world.item.Items.BOOK)),
+                    x + 5, top + 5);
+
             boolean hover = mouseX >= x && mouseX < x + cellW && mouseY >= top && mouseY < top + cellH;
-            if (hover) gg.renderTooltip(mc.font, Component.literal(c.name), mouseX, mouseY);
-            i++;
-            if (i >= MAX_TABS) break;
+            if (hover) {
+                pendingTooltip = Component.literal(c.name());
+                pendingTooltipX = mouseX;
+                pendingTooltipY = mouseY;
+            }
         }
     }
 
@@ -83,17 +123,20 @@ public final class CategoryTabsWidget extends AbstractWidget {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!visible || !active) return false;
         if (button != 0) return false;
+
         int x = getX();
         int y = getY();
+
         for (int i = 0; i < Math.min(categories.size(), MAX_TABS); i++) {
             int top = y + i * (cellH + gap);
             if (mouseX >= x && mouseX < x + cellW && mouseY >= top && mouseY < top + cellH) {
-                String id = categories.get(i).id;
+                String id = categories.get(i).id();
                 selected = id;
                 if (onSelect != null) onSelect.accept(id);
                 return true;
             }
         }
+
         return false;
     }
 
