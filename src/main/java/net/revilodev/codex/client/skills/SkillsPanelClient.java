@@ -1,7 +1,6 @@
 package net.revilodev.codex.client.skills;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.ImageButton;
@@ -17,8 +16,10 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.skills.SkillDefinition;
 import net.revilodev.codex.skills.SkillRegistry;
+import net.revilodev.codex.client.skills.SkillsToggleButton;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -40,6 +41,11 @@ public final class SkillsPanelClient {
     private static Field LEFT_FIELD;
     private static boolean lastOpen = false;
 
+    // recipe book component (to actually hide the panel, not just the button)
+    private static Field RECIPE_BOOK_FIELD;
+    private static Method RECIPE_SET_VISIBLE;
+    private static Field RECIPE_VISIBLE_FIELD;
+
     private SkillsPanelClient() {}
 
     public static void register() {
@@ -57,8 +63,10 @@ public final class SkillsPanelClient {
         State st = new State(inv);
         STATES.put(s, st);
 
-        int btnX = inv.getGuiLeft() + 125;
-        int btnY = inv.getGuiTop() + 40;
+        // keep the previously working offset (+20 right), only move down +1px
+        int btnX = inv.getGuiLeft() + 145;
+        int btnY = inv.getGuiTop() + 61;
+
         SkillsToggleButton btn = new SkillsToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
         st.btn = btn;
 
@@ -66,7 +74,6 @@ public final class SkillsPanelClient {
         e.addListener(st.bg);
 
         st.list = new SkillListWidget(0, 0, 127, PANEL_H - 20, def -> openDetails(st, def));
-        st.list.setSkills(SkillRegistry.skillsFor(net.revilodev.codex.skills.SkillCategory.COMBAT)); // seeded; replaced below
         st.list.setSkills(allSkills());
         st.list.setCategory(st.selectedCategory);
         e.addListener(st.list);
@@ -94,6 +101,7 @@ public final class SkillsPanelClient {
             st.originalLeft = getLeft(inv);
             setLeft(inv, computeCenteredLeft(inv));
             updateVisibility(st);
+            handleRecipeButtonRules(inv, st); // ensures recipe book is hidden immediately
         }
     }
 
@@ -174,6 +182,9 @@ public final class SkillsPanelClient {
         lastOpen = st.open;
 
         if (st.open) {
+            // CLOSE + HIDE recipe book while skills panel is open
+            setRecipeBookVisible(st.inv, false);
+
             if (st.originalLeft == null) st.originalLeft = getLeft(st.inv);
             setLeft(st.inv, computeCenteredLeft(st.inv));
         } else if (st.originalLeft != null) {
@@ -182,6 +193,7 @@ public final class SkillsPanelClient {
 
         reposition(st.inv, st);
         updateVisibility(st);
+        handleRecipeButtonRules(st.inv, st);
     }
 
     private static int computeCenteredLeft(InventoryScreen inv) {
@@ -230,18 +242,26 @@ public final class SkillsPanelClient {
 
     private static void reposition(InventoryScreen inv, State st) {
         if (st.btn != null) {
-            int x = inv.getGuiLeft() + 125;
-            int y = inv.getGuiTop() + 40;
+            int x = inv.getGuiLeft() + 145;
+            int y = inv.getGuiTop() + 61;
             st.btn.setPosition(x, y);
         }
         setPanelChildBounds(inv, st);
     }
 
+    // same rules as your working QuestPanelClient, plus: actually hide the recipe book panel when skills panel is open
     private static void handleRecipeButtonRules(InventoryScreen inv, State st) {
         if (st.open) {
             if (st.btn != null) st.btn.visible = true;
+
+            // hide the vanilla recipe toggle button
             toggleRecipeButtonVisibility(inv, false);
+
+            // hide the actual recipe book panel (this is what prevents overlap)
+            setRecipeBookVisible(inv, false);
+
         } else if (isRecipePanelOpen(inv)) {
+            // recipe book is open -> hide skills toggle (as requested)
             if (st.btn != null) st.btn.visible = false;
             toggleRecipeButtonVisibility(inv, true);
         } else {
@@ -264,6 +284,84 @@ public final class SkillsPanelClient {
         int centeredLeft = (inv.width - inv.getXSize()) / 2;
         return inv.getGuiLeft() > centeredLeft + 10;
     }
+
+    // ---- recipe book panel visibility (minimal + safe reflection) ----
+
+    private static void setRecipeBookVisible(InventoryScreen inv, boolean visible) {
+        try {
+            Object comp = getRecipeBookComponent(inv);
+            if (comp == null) return;
+
+            if (RECIPE_SET_VISIBLE == null) {
+                RECIPE_SET_VISIBLE = findMethod(comp.getClass(), "setVisible", boolean.class);
+            }
+            if (RECIPE_SET_VISIBLE != null) {
+                RECIPE_SET_VISIBLE.invoke(comp, visible);
+                return;
+            }
+
+            if (RECIPE_VISIBLE_FIELD == null) {
+                RECIPE_VISIBLE_FIELD = findBooleanField(comp.getClass(), "visible");
+                if (RECIPE_VISIBLE_FIELD != null) RECIPE_VISIBLE_FIELD.setAccessible(true);
+            }
+            if (RECIPE_VISIBLE_FIELD != null) {
+                RECIPE_VISIBLE_FIELD.setBoolean(comp, visible);
+            }
+        } catch (Throwable ignored) {}
+    }
+
+    private static Object getRecipeBookComponent(InventoryScreen inv) {
+        try {
+            if (RECIPE_BOOK_FIELD == null) {
+                RECIPE_BOOK_FIELD = findRecipeBookField(inv.getClass());
+                if (RECIPE_BOOK_FIELD != null) RECIPE_BOOK_FIELD.setAccessible(true);
+            }
+            return RECIPE_BOOK_FIELD != null ? RECIPE_BOOK_FIELD.get(inv) : null;
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    private static Field findRecipeBookField(Class<?> c) {
+        Class<?> cur = c;
+        while (cur != null) {
+            for (Field f : cur.getDeclaredFields()) {
+                String tn = f.getType().getName();
+                if (tn.endsWith("RecipeBookComponent") || tn.contains("RecipeBookComponent")) {
+                    return f;
+                }
+            }
+            cur = cur.getSuperclass();
+        }
+        return null;
+    }
+
+    private static Method findMethod(Class<?> c, String name, Class<?>... params) {
+        Class<?> cur = c;
+        while (cur != null) {
+            try {
+                Method m = cur.getDeclaredMethod(name, params);
+                m.setAccessible(true);
+                return m;
+            } catch (NoSuchMethodException ignored) {}
+            cur = cur.getSuperclass();
+        }
+        return null;
+    }
+
+    private static Field findBooleanField(Class<?> c, String name) {
+        Class<?> cur = c;
+        while (cur != null) {
+            try {
+                Field f = cur.getDeclaredField(name);
+                if (f.getType() == boolean.class) return f;
+            } catch (NoSuchFieldException ignored) {}
+            cur = cur.getSuperclass();
+        }
+        return null;
+    }
+
+    // ---- leftPos reflection ----
 
     private static Integer getLeft(InventoryScreen inv) {
         try {
