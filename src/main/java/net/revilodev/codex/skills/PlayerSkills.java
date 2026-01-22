@@ -29,7 +29,7 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     }
 
     public boolean tryUpgrade(SkillId id) {
-        SkillDef def = SkillRegistry.def(id);
+        SkillDefinition def = SkillRegistry.def(id);
         if (def == null) return false;
 
         int cur = level(id);

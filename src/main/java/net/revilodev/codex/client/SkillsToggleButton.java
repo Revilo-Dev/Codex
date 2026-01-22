@@ -1,5 +1,4 @@
-// src/main/java/net/revilodev/codex/client/SkillsToggleButton.java
-package net.revilodev.codex.client;
+package net.revilodev.codex.client.skills;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;

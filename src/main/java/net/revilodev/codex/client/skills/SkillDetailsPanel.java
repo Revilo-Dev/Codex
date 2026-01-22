@@ -2,110 +2,329 @@ package net.revilodev.codex.client.skills;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractButton;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.api.distmarker.Dist;
+import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
+import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillCategory;
 import net.revilodev.codex.skills.SkillDefinition;
 import net.revilodev.codex.skills.SkillsAttachments;
 import net.revilodev.codex.skills.SkillsNetwork;
 
-import java.util.function.Supplier;
-
+@OnlyIn(Dist.CLIENT)
 public final class SkillDetailsPanel extends AbstractWidget {
-    private final Supplier<SkillCategory> category;
-    private SkillDefinition selected;
 
-    public SkillDetailsPanel(int x, int y, int w, int h, Supplier<SkillCategory> category, Supplier<SkillDefinition> ignored) {
+    private static final int HEADER_HEIGHT = 28;
+    private static final int BOTTOM_PADDING = 28;
+
+    private static final ResourceLocation TEX_BACK =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_back_button.png");
+    private static final ResourceLocation TEX_BACK_HOVER =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_back_button_hover.png");
+
+    private static final ResourceLocation TEX_UP =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_upgrade_button.png");
+    private static final ResourceLocation TEX_UP_HOVER =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_upgrade_button_hover.png");
+    private static final ResourceLocation TEX_UP_DISABLED =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_upgrade_button_disabled.png");
+
+    private static final ResourceLocation TEX_DOWN =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_downgrade.png");
+    private static final ResourceLocation TEX_DOWN_HOVER =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_downgrade_hover.png");
+    private static final ResourceLocation TEX_DOWN_DISABLED =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_downgrade_disabled.png");
+
+    private final Minecraft mc = Minecraft.getInstance();
+    private SkillDefinition skill;
+
+    private final BackButton back;
+    private final UpgradeButton upgrade;
+    private final DowngradeButton downgrade;
+    private final Runnable onBack;
+
+    private float scrollY = 0f;
+    private int measuredContentHeight = 0;
+
+    public SkillDetailsPanel(int x, int y, int w, int h, Runnable onBack) {
         super(x, y, w, h, Component.empty());
-        this.category = category;
+        this.onBack = onBack;
+
+        this.back = new BackButton(getX(), getY(), () -> {
+            if (this.onBack != null) this.onBack.run();
+        });
+        this.back.visible = false;
+        this.back.active = false;
+
+        this.upgrade = new UpgradeButton(getX(), getY());
+        this.upgrade.visible = false;
+        this.upgrade.active = false;
+
+        this.downgrade = new DowngradeButton(getX(), getY());
+        this.downgrade.visible = false;
+        this.downgrade.active = false;
+
+        setBounds(x, y, w, h);
     }
 
-    public void setPosition(int x, int y) {
-        setX(x);
-        setY(y);
+    public AbstractButton backButton() { return back; }
+    public AbstractButton upgradeButton() { return upgrade; }
+    public AbstractButton downgradeButton() { return downgrade; }
+
+    public void setBounds(int x, int y, int w, int h) {
+        this.setX(x);
+        this.setY(y);
+        this.width = w;
+        this.height = h;
+
+        int cy = y + h - upgrade.getHeight() - 2;
+        int cxCenter = x + (w - upgrade.getWidth()) / 2;
+
+        back.setPosition(x + 2, cy);
+        upgrade.setPosition(cxCenter, cy);
+        downgrade.setPosition(x + w - downgrade.getWidth() - 2, cy);
     }
 
-    public void setSelected(SkillDefinition def) {
-        this.selected = def;
+    public void setSkill(SkillDefinition s) {
+        this.skill = s;
+        this.scrollY = 0f;
     }
 
     @Override
-    protected void renderWidget(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-        g.fill(getX(), getY(), getX() + width, getY() + height, 0xFF121212);
+    protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+        if (!this.visible || skill == null || mc.player == null) return;
 
-        var mc = Minecraft.getInstance();
-        var font = mc.font;
+        int x = this.getX();
+        int y = this.getY();
+        int w = this.width;
 
-        if (selected == null) {
-            g.drawString(font, Component.literal("Select a skill"), getX() + 6, getY() + 6, 0xA0A0A0, false);
-            return;
+        PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
+        SkillCategory cat = skill.category();
+
+        int lvl = ps.level(skill.id());
+        int pts = ps.points(cat);
+
+        int contentTop = y + HEADER_HEIGHT;
+        int contentBottom = upgrade.getY() - 6;
+        int viewportH = Math.max(0, contentBottom - contentTop);
+
+        measuredContentHeight = measureContentHeight(w, lvl);
+        int maxScroll = Math.max(0, measuredContentHeight + BOTTOM_PADDING - viewportH);
+        scrollY = Mth.clamp(scrollY, 0f, maxScroll);
+
+        Item icon = skill.iconItem().orElse(null);
+        if (icon != null) gg.renderItem(new ItemStack(icon), x + 4, y + 4);
+
+        int nameWidth = w - 32;
+        gg.drawWordWrap(mc.font, Component.literal(skill.title()), x + 26, y + 6, nameWidth, 0xFFFFFF);
+
+        String sub = "Level " + lvl + " / " + skill.maxLevel();
+        gg.drawString(mc.font, sub, x + 26, y + 18, 0xA0A0A0, false);
+
+        int ptsColor = (pts <= 0) ? 0xA0A0A0 : 0x55AAFF;
+        String ptsTxt = "Points: " + pts;
+        int ptsW = mc.font.width(ptsTxt);
+        gg.drawString(mc.font, ptsTxt, x + w - ptsW - 2, y + 6, ptsColor, false);
+
+        gg.enableScissor(x, contentTop, x + w, contentBottom);
+
+        int curY = contentTop + 4 - Mth.floor(scrollY);
+
+        if (skill.description() != null && !skill.description().isBlank()) {
+            gg.drawWordWrap(mc.font, Component.literal(skill.description()), x + 4, curY, w - 8, 0xCFCFCF);
+            curY += mc.font.wordWrapHeight(skill.description(), w - 8) + 8;
         }
 
-        var player = mc.player;
-        PlayerSkills skills = player == null ? null : player.getData(SkillsAttachments.PLAYER_SKILLS.get());
+        String eff = effectLine(skill, lvl);
+        if (!eff.isBlank()) {
+            gg.drawString(mc.font, "Effect:", x + 4, curY, 0x55AAFF, false);
+            curY += mc.font.lineHeight + 2;
 
-        int lvl = skills == null ? 0 : skills.level(selected.id());
-        int pts = skills == null ? 0 : skills.points(category.get());
+            gg.drawWordWrap(mc.font, Component.literal(eff), x + 4, curY, w - 8, 0xCFCFCF);
+            curY += mc.font.wordWrapHeight(eff, w - 8) + 6;
+        }
 
-        g.drawString(font, Component.literal(selected.title()), getX() + 6, getY() + 4, 0xFFFFFF, false);
-        g.drawString(font, Component.literal(selected.description()), getX() + 6, getY() + 14, 0xB0B0B0, false);
-        g.drawString(font, Component.literal("Lv " + lvl + " / " + selected.maxLevel()), getX() + 6, getY() + 24, 0xA0A0A0, false);
-        g.drawString(font, Component.literal(category.get().title() + " Points: " + pts), getX() + 6, getY() + 34, 0xA0A0A0, false);
+        gg.disableScissor();
 
-        int upX = getX() + width - 52;
-        int upY = getY() + 6;
-        int dnX = upX + 24;
+        boolean canUp = pts > 0 && lvl < skill.maxLevel();
+        boolean canDown = lvl > 0;
 
-        boolean canUp = pts > 0 && lvl < selected.maxLevel();
-        boolean canDn = lvl > 0;
+        upgrade.active = canUp;
+        downgrade.active = canDown;
 
-        g.fill(upX, upY, upX + 20, upY + 12, canUp ? 0xFF2A2A2A : 0xFF1A1A1A);
-        g.fill(dnX, upY, dnX + 20, upY + 12, canDn ? 0xFF2A2A2A : 0xFF1A1A1A);
+        back.visible = true;
+        back.active = true;
 
-        g.drawString(font, Component.literal("+"), upX + 7, upY + 2, canUp ? 0xFFFFFF : 0x707070, false);
-        g.drawString(font, Component.literal("-"), dnX + 7, upY + 2, canDn ? 0xFFFFFF : 0x707070, false);
+        upgrade.visible = true;
+        downgrade.visible = true;
+
+        back.render(gg, mouseX, mouseY, partialTick);
+        upgrade.render(gg, mouseX, mouseY, partialTick);
+        downgrade.render(gg, mouseX, mouseY, partialTick);
+    }
+
+    private String effectLine(SkillDefinition def, int level) {
+        if (def == null) return "";
+        if (level <= 0) return "No bonuses active.";
+        String id = def.id().name();
+
+        return switch (id) {
+            case "SHARPNESS" -> "+" + fmt(level * 0.20D) + " melee damage";
+            case "POWER" -> "+" + fmt(level * 0.15D) + " ranged damage";
+            case "CRIT_BONUS" -> "+" + fmt(level * 1.0D) + "% critical damage";
+            case "FIRE_RESISTANCE" -> "-" + fmt(level * 2.0D) + "% fire damage";
+            case "BLAST_RESISTANCE" -> "-" + fmt(level * 2.0D) + "% explosion damage";
+            case "PROJECTILE_RESISTANCE" -> "-" + fmt(level * 2.0D) + "% projectile damage";
+            case "KNOCKBACK_RESISTANCE" -> "-" + fmt(level * 2.0D) + "% knockback";
+            case "HEALTH" -> "+" + fmt(level * 0.5D) + " max health";
+            case "REGENERATION" -> "Passive regen (level " + level + ")";
+            case "SWIFTNESS" -> "+" + fmt(level * 1.0D) + "% move speed";
+            case "DEFENSE" -> "+" + fmt(level * 0.5D) + " armor";
+            case "SATURATION" -> "Improved hunger sustain (level " + level + ")";
+            case "LEAPING" -> "+" + fmt(level * 2.0D) + "% jump height";
+            case "EFFICIENCY" -> "+" + fmt(level * 1.0D) + "% mining speed";
+            case "CHOPPING" -> "+" + fmt(level * 1.0D) + "% chopping speed";
+            case "FORAGING" -> "Better harvest outcomes (level " + level + ")";
+            case "FORTUNE" -> "Better loot outcomes (level " + level + ")";
+            default -> "Bonus (level " + level + ")";
+        };
+    }
+
+    private String fmt(double v) {
+        if (Math.abs(v - Math.rint(v)) < 1e-9) return Integer.toString((int) Math.rint(v));
+        String s = String.format(java.util.Locale.ROOT, "%.2f", v);
+        while (s.contains(".") && (s.endsWith("0") || s.endsWith("."))) s = s.substring(0, s.length() - 1);
+        return s;
+    }
+
+    private int measureContentHeight(int panelWidth, int lvl) {
+        int w = panelWidth;
+        int y = 0;
+
+        if (skill.description() != null && !skill.description().isBlank()) {
+            y += mc.font.wordWrapHeight(skill.description(), w - 8) + 8;
+        }
+
+        String eff = effectLine(skill, lvl);
+        if (!eff.isBlank()) {
+            y += mc.font.lineHeight + 2;
+            y += mc.font.wordWrapHeight(eff, w - 8) + 6;
+        }
+
+        return y;
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
+        if (!this.visible || !this.active) return false;
+
+        int contentTop = this.getY() + HEADER_HEIGHT;
+        int contentBottom = upgrade.getY() - 6;
+
+        if (mouseX < this.getX() || mouseX > this.getX() + this.width) return false;
+        if (mouseY < contentTop || mouseY > contentBottom) return false;
+
+        int viewportH = Math.max(0, contentBottom - contentTop);
+        int maxScroll = Math.max(0, measuredContentHeight + BOTTOM_PADDING - viewportH);
+        if (maxScroll <= 0) return false;
+
+        scrollY = Mth.clamp(scrollY - (float) (delta * 12), 0f, maxScroll);
+        return true;
+    }
+
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        return mouseScrolled(mouseX, mouseY, deltaY);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (!visible || !active) return false;
-        if (button != 0) return false;
-        if (selected == null) return false;
-
-        var mc = Minecraft.getInstance();
-        var player = mc.player;
-        if (player == null) return false;
-
-        PlayerSkills skills = player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        int lvl = skills.level(selected.id());
-        int pts = skills.points(category.get());
-
-        int upX = getX() + width - 52;
-        int upY = getY() + 6;
-        int dnX = upX + 24;
-
-        if (mouseX >= upX && mouseX < upX + 20 && mouseY >= upY && mouseY < upY + 12) {
-            if (pts > 0 && lvl < selected.maxLevel()) {
-                PacketDistributor.sendToServer(new SkillsNetwork.SkillActionPayload(selected.id().ordinal(), true));
-                return true;
-            }
-            return false;
-        }
-
-        if (mouseX >= dnX && mouseX < dnX + 20 && mouseY >= upY && mouseY < upY + 12) {
-            if (lvl > 0) {
-                PacketDistributor.sendToServer(new SkillsNetwork.SkillActionPayload(selected.id().ordinal(), false));
-                return true;
-            }
-            return false;
-        }
-
+        if (!this.visible || !this.active || button != 0) return false;
         return false;
     }
 
     @Override
     protected void updateWidgetNarration(NarrationElementOutput narration) {}
+
+    private final class BackButton extends AbstractButton {
+        private final Runnable onPress;
+
+        public BackButton(int x, int y, Runnable onPress) {
+            super(x, y, 24, 20, Component.empty());
+            this.onPress = onPress;
+        }
+
+        @Override
+        public void onPress() {
+            if (onPress != null) onPress.run();
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+            boolean hovered = this.isMouseOver(mouseX, mouseY);
+            ResourceLocation tex = hovered ? TEX_BACK_HOVER : TEX_BACK;
+            gg.blit(tex, getX(), getY(), 0, 0, this.width, this.height, this.width, this.height);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+    }
+
+    private final class UpgradeButton extends AbstractButton {
+        public UpgradeButton(int x, int y) {
+            super(x, y, 68, 20, Component.literal("Upgrade"));
+        }
+
+        @Override
+        public void onPress() {
+            if (!this.active || skill == null) return;
+            PacketDistributor.sendToServer(new SkillsNetwork.SkillActionPayload(skill.id().ordinal(), true));
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+            boolean hovered = this.active && this.isMouseOver(mouseX, mouseY);
+            ResourceLocation tex = !this.active ? TEX_UP_DISABLED : (hovered ? TEX_UP_HOVER : TEX_UP);
+            gg.blit(tex, getX(), getY(), 0, 0, this.width, this.height, this.width, this.height);
+
+            int textW = mc.font.width(getMessage());
+            int textX = getX() + (this.width - textW) / 2 + 2;
+            int textY = getY() + (this.height - mc.font.lineHeight) / 2 + 1;
+            int color = this.active ? 0xFFFFFF : 0x808080;
+            gg.drawString(mc.font, getMessage(), textX, textY, color, false);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+    }
+
+    private final class DowngradeButton extends AbstractButton {
+        public DowngradeButton(int x, int y) {
+            super(x, y, 24, 20, Component.empty());
+        }
+
+        @Override
+        public void onPress() {
+            if (!this.active || skill == null) return;
+            PacketDistributor.sendToServer(new SkillsNetwork.SkillActionPayload(skill.id().ordinal(), false));
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+            boolean hovered = this.isMouseOver(mouseX, mouseY);
+            ResourceLocation tex = !this.active ? TEX_DOWN_DISABLED : (hovered ? TEX_DOWN_HOVER : TEX_DOWN);
+            gg.blit(tex, getX(), getY(), 0, 0, this.width, this.height, this.width, this.height);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+    }
 }

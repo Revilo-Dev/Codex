@@ -1,6 +1,9 @@
 package net.revilodev.codex.skills;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 
 import java.util.Locale;
 
@@ -17,6 +20,22 @@ public enum SkillCategory {
         this.id = id;
         this.title = title;
         this.icon = icon;
+    }
+
+    public String id() {
+        return id;
+    }
+
+    public String title() {
+        return title;
+    }
+
+    public ResourceLocation iconId() {
+        return icon;
+    }
+
+    public Item icon() {
+        return BuiltInRegistries.ITEM.getOptional(icon).orElse(Items.BOOK);
     }
 
     public static SkillCategory byId(String id) {

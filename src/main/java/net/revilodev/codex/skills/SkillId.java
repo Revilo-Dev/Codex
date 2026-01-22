@@ -42,4 +42,10 @@ public enum SkillId {
     public ResourceLocation icon() { return icon; }
     public String description() { return description; }
     public int maxLevel() { return maxLevel; }
+
+    public static SkillId byOrdinal(int ord) {
+        SkillId[] v = values();
+        if (ord < 0 || ord >= v.length) return null;
+        return v[ord];
+    }
 }

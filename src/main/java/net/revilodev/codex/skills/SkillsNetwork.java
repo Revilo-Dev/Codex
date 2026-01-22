@@ -1,8 +1,7 @@
 package net.revilodev.codex.skills;
 
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.FriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
+import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -32,8 +31,10 @@ public final class SkillsNetwork {
     private static void handleSync(SkillsSyncPayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (ctx.player() == null) return;
+            CompoundTag tag = payload.data();
+            if (tag == null) tag = new CompoundTag();
             ctx.player().getData(SkillsAttachments.PLAYER_SKILLS.get())
-                    .deserializeNBT(ctx.player().level().registryAccess(), payload.data());
+                    .deserializeNBT(ctx.player().level().registryAccess(), tag);
         });
     }
 
@@ -60,8 +61,14 @@ public final class SkillsNetwork {
         public static final Type<SkillsSyncPayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skills_sync"));
 
-        public static final StreamCodec<FriendlyByteBuf, SkillsSyncPayload> STREAM_CODEC =
-                StreamCodec.composite(ByteBufCodecs.COMPOUND_TAG, SkillsSyncPayload::data, SkillsSyncPayload::new);
+        public static final StreamCodec<RegistryFriendlyByteBuf, SkillsSyncPayload> STREAM_CODEC =
+                StreamCodec.of(
+                        (buf, msg) -> buf.writeNbt(msg.data),
+                        buf -> {
+                            CompoundTag tag = buf.readNbt();
+                            return new SkillsSyncPayload(tag == null ? new CompoundTag() : tag);
+                        }
+                );
 
         @Override
         public Type<? extends CustomPacketPayload> type() {
@@ -73,11 +80,13 @@ public final class SkillsNetwork {
         public static final Type<SkillActionPayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_action"));
 
-        public static final StreamCodec<FriendlyByteBuf, SkillActionPayload> STREAM_CODEC =
-                StreamCodec.composite(
-                        ByteBufCodecs.VAR_INT, SkillActionPayload::skillOrdinal,
-                        ByteBufCodecs.BOOL, SkillActionPayload::upgrade,
-                        SkillActionPayload::new
+        public static final StreamCodec<RegistryFriendlyByteBuf, SkillActionPayload> STREAM_CODEC =
+                StreamCodec.of(
+                        (buf, msg) -> {
+                            buf.writeVarInt(msg.skillOrdinal);
+                            buf.writeBoolean(msg.upgrade);
+                        },
+                        buf -> new SkillActionPayload(buf.readVarInt(), buf.readBoolean())
                 );
 
         @Override

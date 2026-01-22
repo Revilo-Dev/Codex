@@ -35,14 +35,14 @@ public final class SkillsEvents {
 
     private static void onLogin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer sp)) return;
-        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS);
+        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         SkillsEffects.applyServerTickEffects(sp, skills);
         SkillsNetwork.syncTo(sp);
     }
 
     private static void onRespawn(PlayerEvent.PlayerRespawnEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer sp)) return;
-        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS);
+        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         SkillsEffects.applyServerTickEffects(sp, skills);
         SkillsNetwork.syncTo(sp);
     }
@@ -52,7 +52,7 @@ public final class SkillsEvents {
         DamageSource src = event.getSource();
         if (!(src.getEntity() instanceof ServerPlayer sp)) return;
 
-        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS);
+        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         skills.addPoints(SkillCategory.COMBAT, 1);
         SkillsNetwork.syncTo(sp);
     }
@@ -61,7 +61,7 @@ public final class SkillsEvents {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getPlayer() instanceof ServerPlayer sp)) return;
 
-        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS);
+        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         skills.addPoints(SkillCategory.UTILITY, 1);
         SkillsNetwork.syncTo(sp);
     }
@@ -72,7 +72,7 @@ public final class SkillsEvents {
         DamageSource src = event.getSource();
 
         if (event.getEntity() instanceof ServerPlayer target) {
-            PlayerSkills ts = target.getData(SkillsAttachments.PLAYER_SKILLS);
+            PlayerSkills ts = target.getData(SkillsAttachments.PLAYER_SKILLS.get());
             float amt = event.getAmount();
 
             int fire = ts.level(SkillId.FIRE_RESISTANCE);
@@ -89,7 +89,7 @@ public final class SkillsEvents {
         }
 
         if (src.getEntity() instanceof ServerPlayer attacker) {
-            PlayerSkills as = attacker.getData(SkillsAttachments.PLAYER_SKILLS);
+            PlayerSkills as = attacker.getData(SkillsAttachments.PLAYER_SKILLS.get());
             float amt = event.getAmount();
 
             boolean projectile = event.getSource().getDirectEntity() instanceof AbstractArrow;
@@ -124,7 +124,7 @@ public final class SkillsEvents {
         int pts = (int) (prevented / 2.0F);
         if (pts <= 0) return;
 
-        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS);
+        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         skills.addPoints(SkillCategory.SURVIVAL, pts);
         SkillsNetwork.syncTo(sp);
     }
@@ -133,7 +133,7 @@ public final class SkillsEvents {
         if (event.getEntity().level().isClientSide) return;
         if (!(event.getEntity() instanceof ServerPlayer sp)) return;
 
-        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS);
+        PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         int lvl = skills.level(SkillId.KNOCKBACK_RESISTANCE);
         if (lvl <= 0) return;
 
@@ -144,7 +144,7 @@ public final class SkillsEvents {
     private static void onPlayerTick(PlayerTickEvent.Post event) {
         if (!(event.getEntity() instanceof ServerPlayer sp)) return;
         if (sp.tickCount % 20 != 0) return;
-        SkillsEffects.applyServerTickEffects(sp, sp.getData(SkillsAttachments.PLAYER_SKILLS));
+        SkillsEffects.applyServerTickEffects(sp, sp.getData(SkillsAttachments.PLAYER_SKILLS.get()));
     }
 
     private static boolean isCritical(ServerPlayer player) {
