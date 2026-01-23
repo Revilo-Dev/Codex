@@ -11,15 +11,15 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.CodexMod;
+import net.revilodev.codex.client.SkillsToggleButton;
 import net.revilodev.codex.skills.SkillDefinition;
 import net.revilodev.codex.skills.SkillRegistry;
-import net.revilodev.codex.client.skills.SkillsToggleButton;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.WeakHashMap;
 
@@ -41,19 +41,18 @@ public final class SkillsPanelClient {
     private static Field LEFT_FIELD;
     private static boolean lastOpen = false;
 
-    // recipe book component (to actually hide the panel, not just the button)
-    private static Field RECIPE_BOOK_FIELD;
-    private static Method RECIPE_SET_VISIBLE;
-    private static Field RECIPE_VISIBLE_FIELD;
-
     private SkillsPanelClient() {}
 
     public static void register() {
-        NeoForge.EVENT_BUS.addListener(SkillsPanelClient::onScreenInit);
-        NeoForge.EVENT_BUS.addListener(SkillsPanelClient::onScreenClosing);
-        NeoForge.EVENT_BUS.addListener(SkillsPanelClient::onScreenRenderPre);
-        NeoForge.EVENT_BUS.addListener(SkillsPanelClient::onScreenRenderPost);
-        NeoForge.EVENT_BUS.addListener(SkillsPanelClient::onMouseScrolled);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, SkillsPanelClient::onScreenInit);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Closing.class, SkillsPanelClient::onScreenClosing);
+
+        // Run LAST so our "hide recipe button while skills open" wins,
+        // but we DO NOT force-show when skills is closed (so QuestPanelClient can still hide it).
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, ScreenEvent.Render.Pre.class, SkillsPanelClient::onScreenRenderPre);
+
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, SkillsPanelClient::onScreenRenderPost);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
     }
 
     public static void onScreenInit(ScreenEvent.Init.Post e) {
@@ -63,7 +62,6 @@ public final class SkillsPanelClient {
         State st = new State(inv);
         STATES.put(s, st);
 
-        // keep the previously working offset (+20 right), only move down +1px
         int btnX = inv.getGuiLeft() + 145;
         int btnY = inv.getGuiTop() + 61;
 
@@ -96,12 +94,16 @@ public final class SkillsPanelClient {
 
         reposition(inv, st);
 
+        // Cache the vanilla recipe button (your debug shows it is ImageButton 20x18 at 229,98).
+        st.recipeBtn = findRecipeButton(inv);
+
         if (lastOpen) {
             st.open = true;
             st.originalLeft = getLeft(inv);
             setLeft(inv, computeCenteredLeft(inv));
             updateVisibility(st);
-            handleRecipeButtonRules(inv, st); // ensures recipe book is hidden immediately
+            applySkillsVsRecipePanelRule(inv, st);
+            forceHideRecipeButtonIfSkillsOpen(st);
         }
     }
 
@@ -124,7 +126,19 @@ public final class SkillsPanelClient {
 
         reposition(inv, st);
         updateVisibility(st);
-        handleRecipeButtonRules(inv, st);
+        applySkillsVsRecipePanelRule(inv, st);
+
+        if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(inv);
+
+        // Key behavior:
+        // - If skills is open -> force-hide recipe button (green book).
+        // - If skills is closed -> DO NOT force-show (QuestPanelClient can hide it when quest open).
+        // - If we previously hid it and skills is now closed -> restore ONLY if quest is not open.
+        if (st.open) {
+            forceHideRecipeButtonIfSkillsOpen(st);
+        } else {
+            restoreRecipeButtonIfWeHidIt(inv, st);
+        }
     }
 
     public static void onScreenRenderPost(ScreenEvent.Render.Post e) {
@@ -182,9 +196,6 @@ public final class SkillsPanelClient {
         lastOpen = st.open;
 
         if (st.open) {
-            // CLOSE + HIDE recipe book while skills panel is open
-            setRecipeBookVisible(st.inv, false);
-
             if (st.originalLeft == null) st.originalLeft = getLeft(st.inv);
             setLeft(st.inv, computeCenteredLeft(st.inv));
         } else if (st.originalLeft != null) {
@@ -193,8 +204,89 @@ public final class SkillsPanelClient {
 
         reposition(st.inv, st);
         updateVisibility(st);
-        handleRecipeButtonRules(st.inv, st);
+        applySkillsVsRecipePanelRule(st.inv, st);
+
+        if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(st.inv);
+
+        if (st.open) {
+            forceHideRecipeButtonIfSkillsOpen(st);
+        } else {
+            restoreRecipeButtonIfWeHidIt(st.inv, st);
+        }
     }
+
+    // Keep your old behavior: if vanilla recipe panel is open (left shifted), hide skills toggle.
+    // This does NOT touch the recipe button.
+    private static void applySkillsVsRecipePanelRule(InventoryScreen inv, State st) {
+        if (st.open) {
+            if (st.btn != null) st.btn.visible = true;
+            return;
+        }
+
+        if (isRecipePanelOpen(inv)) {
+            if (st.btn != null) st.btn.visible = false;
+        } else {
+            if (st.btn != null) st.btn.visible = true;
+        }
+    }
+
+    // ---- recipe button control (green book) ----
+
+    private static void forceHideRecipeButtonIfSkillsOpen(State st) {
+        if (st.recipeBtn == null) return;
+        st.recipeBtn.visible = false;
+        st.recipeBtn.active = false;
+        st.recipeHiddenBySkills = true;
+    }
+
+    private static void restoreRecipeButtonIfWeHidIt(InventoryScreen inv, State st) {
+        if (!st.recipeHiddenBySkills) return;
+
+        // If quest panel is open, DO NOT restore here; let QuestPanelClient continue hiding/showing.
+        if (isQuestPanelOpen(inv)) {
+            st.recipeHiddenBySkills = false;
+            return;
+        }
+
+        if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(inv);
+        if (st.recipeBtn != null) {
+            st.recipeBtn.visible = true;
+            st.recipeBtn.active = true;
+        }
+        st.recipeHiddenBySkills = false;
+    }
+
+    private static ImageButton findRecipeButton(InventoryScreen inv) {
+        for (var child : inv.children()) {
+            if (child instanceof ImageButton btn) {
+                if (btn.getWidth() == 20 && btn.getHeight() == 18) {
+                    return btn;
+                }
+            }
+        }
+        return null;
+    }
+
+    // Detect quest panel open without referencing Boundless classes directly (no hard dependency).
+    // Your debug shows QuestPanelClient$PanelBackground exists and is visible=true when quest panel is open.
+    private static boolean isQuestPanelOpen(InventoryScreen inv) {
+        for (var child : inv.children()) {
+            if (child instanceof AbstractWidget w) {
+                String n = child.getClass().getName();
+                if (n.equals("net.revilodev.boundless.client.QuestPanelClient$PanelBackground") && w.visible) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isRecipePanelOpen(InventoryScreen inv) {
+        int centeredLeft = (inv.width - inv.getXSize()) / 2;
+        return inv.getGuiLeft() > centeredLeft + 10;
+    }
+
+    // ---- layout ----
 
     private static int computeCenteredLeft(InventoryScreen inv) {
         int screenW = inv.width;
@@ -220,7 +312,6 @@ public final class SkillsPanelClient {
         int ph = PANEL_H - 20;
 
         if (st.bg != null) st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
-
         if (st.list != null) st.list.setBounds(px, py, pw, ph);
 
         if (st.details != null) {
@@ -247,118 +338,6 @@ public final class SkillsPanelClient {
             st.btn.setPosition(x, y);
         }
         setPanelChildBounds(inv, st);
-    }
-
-    // same rules as your working QuestPanelClient, plus: actually hide the recipe book panel when skills panel is open
-    private static void handleRecipeButtonRules(InventoryScreen inv, State st) {
-        if (st.open) {
-            if (st.btn != null) st.btn.visible = true;
-
-            // hide the vanilla recipe toggle button
-            toggleRecipeButtonVisibility(inv, false);
-
-            // hide the actual recipe book panel (this is what prevents overlap)
-            setRecipeBookVisible(inv, false);
-
-        } else if (isRecipePanelOpen(inv)) {
-            // recipe book is open -> hide skills toggle (as requested)
-            if (st.btn != null) st.btn.visible = false;
-            toggleRecipeButtonVisibility(inv, true);
-        } else {
-            if (st.btn != null) st.btn.visible = true;
-            toggleRecipeButtonVisibility(inv, true);
-        }
-    }
-
-    private static void toggleRecipeButtonVisibility(InventoryScreen inv, boolean visible) {
-        for (var child : inv.children()) {
-            if (child instanceof ImageButton btn) {
-                if (btn.getWidth() == 20 && btn.getHeight() == 18) {
-                    btn.visible = visible;
-                }
-            }
-        }
-    }
-
-    private static boolean isRecipePanelOpen(InventoryScreen inv) {
-        int centeredLeft = (inv.width - inv.getXSize()) / 2;
-        return inv.getGuiLeft() > centeredLeft + 10;
-    }
-
-    // ---- recipe book panel visibility (minimal + safe reflection) ----
-
-    private static void setRecipeBookVisible(InventoryScreen inv, boolean visible) {
-        try {
-            Object comp = getRecipeBookComponent(inv);
-            if (comp == null) return;
-
-            if (RECIPE_SET_VISIBLE == null) {
-                RECIPE_SET_VISIBLE = findMethod(comp.getClass(), "setVisible", boolean.class);
-            }
-            if (RECIPE_SET_VISIBLE != null) {
-                RECIPE_SET_VISIBLE.invoke(comp, visible);
-                return;
-            }
-
-            if (RECIPE_VISIBLE_FIELD == null) {
-                RECIPE_VISIBLE_FIELD = findBooleanField(comp.getClass(), "visible");
-                if (RECIPE_VISIBLE_FIELD != null) RECIPE_VISIBLE_FIELD.setAccessible(true);
-            }
-            if (RECIPE_VISIBLE_FIELD != null) {
-                RECIPE_VISIBLE_FIELD.setBoolean(comp, visible);
-            }
-        } catch (Throwable ignored) {}
-    }
-
-    private static Object getRecipeBookComponent(InventoryScreen inv) {
-        try {
-            if (RECIPE_BOOK_FIELD == null) {
-                RECIPE_BOOK_FIELD = findRecipeBookField(inv.getClass());
-                if (RECIPE_BOOK_FIELD != null) RECIPE_BOOK_FIELD.setAccessible(true);
-            }
-            return RECIPE_BOOK_FIELD != null ? RECIPE_BOOK_FIELD.get(inv) : null;
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    private static Field findRecipeBookField(Class<?> c) {
-        Class<?> cur = c;
-        while (cur != null) {
-            for (Field f : cur.getDeclaredFields()) {
-                String tn = f.getType().getName();
-                if (tn.endsWith("RecipeBookComponent") || tn.contains("RecipeBookComponent")) {
-                    return f;
-                }
-            }
-            cur = cur.getSuperclass();
-        }
-        return null;
-    }
-
-    private static Method findMethod(Class<?> c, String name, Class<?>... params) {
-        Class<?> cur = c;
-        while (cur != null) {
-            try {
-                Method m = cur.getDeclaredMethod(name, params);
-                m.setAccessible(true);
-                return m;
-            } catch (NoSuchMethodException ignored) {}
-            cur = cur.getSuperclass();
-        }
-        return null;
-    }
-
-    private static Field findBooleanField(Class<?> c, String name) {
-        Class<?> cur = c;
-        while (cur != null) {
-            try {
-                Field f = cur.getDeclaredField(name);
-                if (f.getType() == boolean.class) return f;
-            } catch (NoSuchFieldException ignored) {}
-            cur = cur.getSuperclass();
-        }
-        return null;
     }
 
     // ---- leftPos reflection ----
@@ -473,6 +452,9 @@ public final class SkillsPanelClient {
         SkillListWidget list;
         SkillDetailsPanel details;
         SkillCategoryTabsWidget tabs;
+
+        ImageButton recipeBtn;
+        boolean recipeHiddenBySkills;
 
         boolean showingDetails;
         boolean open;

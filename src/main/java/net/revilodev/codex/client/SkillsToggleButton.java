@@ -1,4 +1,4 @@
-package net.revilodev.codex.client.skills;
+package net.revilodev.codex.client;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
