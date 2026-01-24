@@ -1,4 +1,3 @@
-// src/main/java/net/revilodev/codex/client/screen/StandaloneSkillsBookScreen.java
 package net.revilodev.codex.client.screen;
 
 import net.minecraft.client.gui.GuiGraphics;
@@ -11,6 +10,8 @@ import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.client.skills.SkillCategoryTabsWidget;
 import net.revilodev.codex.client.skills.SkillDetailsPanel;
 import net.revilodev.codex.client.skills.SkillListWidget;
+import net.revilodev.codex.skills.SkillDefinition;
+import net.revilodev.codex.skills.SkillId;
 import net.revilodev.codex.skills.SkillRegistry;
 
 @OnlyIn(Dist.CLIENT)
@@ -54,7 +55,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
 
         tabs = new SkillCategoryTabsWidget(leftX - 23, topY + 4, 26, panelHeight - 8, id -> {
             selectedCategory = id;
-            list.setCategory(id);
+            if (list != null) list.setCategory(id);
             showingDetails = false;
             updateVisibility();
         });
@@ -62,6 +63,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
         tabs.setSelected(selectedCategory);
 
         list = new SkillListWidget(pxLeft, py, pw, ph, def -> {
+            if (def == null) return;
             details.setSkill(def);
             showingDetails = true;
             updateVisibility();
@@ -77,6 +79,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
 
         addRenderableWidget(tabs);
         addRenderableWidget(list);
+
         addRenderableWidget(details);
         addRenderableWidget(details.backButton());
         addRenderableWidget(details.upgradeButton());
@@ -85,15 +88,13 @@ public final class StandaloneSkillsBookScreen extends Screen {
         updateVisibility();
     }
 
-    private Iterable<net.revilodev.codex.skills.SkillDefinition> allSkills() {
-        return () -> net.revilodev.codex.skills.SkillId.values().length == 0
-                ? java.util.Collections.<net.revilodev.codex.skills.SkillDefinition>emptyIterator()
-                : new java.util.Iterator<>() {
-            private final net.revilodev.codex.skills.SkillId[] ids = net.revilodev.codex.skills.SkillId.values();
+    private Iterable<SkillDefinition> allSkills() {
+        return () -> new java.util.Iterator<>() {
+            private final SkillId[] ids = SkillId.values();
             private int i = 0;
 
             @Override public boolean hasNext() { return i < ids.length; }
-            @Override public net.revilodev.codex.skills.SkillDefinition next() { return SkillRegistry.def(ids[i++]); }
+            @Override public SkillDefinition next() { return SkillRegistry.def(ids[i++]); }
         };
     }
 
@@ -118,8 +119,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
     }
 
     @Override
-    public void renderBackground(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
-    }
+    public void renderBackground(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {}
 
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
@@ -137,12 +137,14 @@ public final class StandaloneSkillsBookScreen extends Screen {
                 if (list.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;
             }
         }
+
         if (details.visible && details.active) {
             if (mouseX >= details.getX() && mouseX <= details.getX() + details.getWidth()
                     && mouseY >= details.getY() && mouseY <= details.getY() + details.getHeight()) {
                 if (details.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;
             }
         }
+
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 

@@ -14,13 +14,11 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.revilodev.codex.CodexMod;
-import net.revilodev.codex.client.screen.StandaloneSkillsBookScreen;
 import net.revilodev.codex.skills.logic.SkillLogic;
 
 public final class SkillsNetwork {
     private SkillsNetwork() {}
 
-    // MUST be ONE value used across all codex payloads
     private static final String VERSION = "1";
     private static boolean REGISTERED = false;
 
@@ -28,19 +26,15 @@ public final class SkillsNetwork {
         if (REGISTERED) return;
         REGISTERED = true;
 
-        PayloadRegistrar registrar = event.registrar(CodexMod.MOD_ID).versioned(VERSION);
+        PayloadRegistrar r = event.registrar(CodexMod.MOD_ID).versioned(VERSION);
 
         // server -> client
-        registrar.playToClient(SkillsSyncPayload.TYPE, SkillsSyncPayload.STREAM_CODEC, SkillsNetwork::handleSync);
-        registrar.playToClient(OpenSkillsBookPayload.TYPE, OpenSkillsBookPayload.STREAM_CODEC, SkillsNetwork::handleOpenSkillsBook);
+        r.playToClient(SkillsSyncPayload.TYPE, SkillsSyncPayload.STREAM_CODEC, SkillsNetwork::handleSync);
+        r.playToClient(OpenSkillsBookPayload.TYPE, OpenSkillsBookPayload.STREAM_CODEC, SkillsNetwork::handleOpenSkillsBook);
 
         // client -> server
-        registrar.playToServer(SkillActionPayload.TYPE, SkillActionPayload.STREAM_CODEC, SkillsNetwork::handleAction);
+        r.playToServer(SkillActionPayload.TYPE, SkillActionPayload.STREAM_CODEC, SkillsNetwork::handleAction);
     }
-
-    // --------------------
-    // API
-    // --------------------
 
     public static void syncTo(ServerPlayer player) {
         PlayerSkills skills = player.getData(SkillsAttachments.PLAYER_SKILLS.get());
@@ -52,13 +46,10 @@ public final class SkillsNetwork {
         PacketDistributor.sendToPlayer(player, new OpenSkillsBookPayload());
     }
 
-    // --------------------
-    // Handlers
-    // --------------------
-
     private static void handleSync(SkillsSyncPayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (ctx.player() == null) return;
+
             CompoundTag tag = payload.data();
             if (tag == null) tag = new CompoundTag();
 
@@ -79,8 +70,11 @@ public final class SkillsNetwork {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer sp)) return;
 
-            SkillId id = SkillId.byOrdinal(payload.skillOrdinal());
-            if (id == null) return;
+            SkillId[] vals = SkillId.values();
+            int ord = payload.skillOrdinal();
+            if (ord < 0 || ord >= vals.length) return;
+
+            SkillId id = vals[ord];
 
             PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
             boolean changed = payload.upgrade()
@@ -93,10 +87,6 @@ public final class SkillsNetwork {
             syncTo(sp);
         });
     }
-
-    // --------------------
-    // Payloads
-    // --------------------
 
     public record SkillsSyncPayload(CompoundTag data) implements CustomPacketPayload {
         public static final Type<SkillsSyncPayload> TYPE =
@@ -114,6 +104,7 @@ public final class SkillsNetwork {
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
+    // Used by SkillDetailsPanel (client -> server)
     public record SkillActionPayload(int skillOrdinal, boolean upgrade) implements CustomPacketPayload {
         public static final Type<SkillActionPayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_action"));
@@ -130,12 +121,13 @@ public final class SkillsNetwork {
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
+    // Used by SkillsBookItem (server -> client)
     public record OpenSkillsBookPayload() implements CustomPacketPayload {
         public static final Type<OpenSkillsBookPayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "open_skills_book"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, OpenSkillsBookPayload> STREAM_CODEC =
-                StreamCodec.unit(new OpenSkillsBookPayload());
+                StreamCodec.of((buf, msg) -> {}, buf -> new OpenSkillsBookPayload());
 
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
@@ -143,7 +135,8 @@ public final class SkillsNetwork {
     @OnlyIn(Dist.CLIENT)
     private static final class ClientOnly {
         private static void openSkillsBook() {
-            net.minecraft.client.Minecraft.getInstance().setScreen(new StandaloneSkillsBookScreen());
+            net.minecraft.client.Minecraft.getInstance()
+                    .setScreen(new net.revilodev.codex.client.screen.StandaloneSkillsBookScreen());
         }
     }
 }

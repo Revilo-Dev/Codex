@@ -1,18 +1,27 @@
 package net.revilodev.codex.skills.logic;
 
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.level.LevelAccessor;
+import net.minecraft.world.level.block.state.BlockState;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillCategory;
 import net.revilodev.codex.skills.SkillId;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public final class SkillLogic {
     private SkillLogic() {}
@@ -23,6 +32,12 @@ public final class SkillLogic {
     private static final ResourceLocation MOD_KB_RES = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_knockback_res");
     private static final ResourceLocation MOD_LUCK = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_luck");
 
+    private static final Map<UUID, Streak> COMBAT_STREAK = new HashMap<>();
+    private static final Map<UUID, Streak> UTILITY_STREAK = new HashMap<>();
+
+    private static final int COMBAT_WINDOW_TICKS = 200;
+    private static final int UTILITY_WINDOW_TICKS = 160;
+
     public static boolean tryUpgrade(PlayerSkills skills, SkillId id) {
         return skills.tryUpgrade(id);
     }
@@ -31,22 +46,58 @@ public final class SkillLogic {
         return skills.tryDowngrade(id);
     }
 
-    public static boolean awardCombatKill(PlayerSkills skills) {
-        skills.addPoints(SkillCategory.COMBAT, 1);
-        return true;
+    public static boolean awardCombatKill(ServerPlayer killer, PlayerSkills skills, LivingEntity victim) {
+        if (killer == null || victim == null) return false;
+        int xp = combatKillXp(victim);
+        float mult = streakMultiplier(COMBAT_STREAK, killer.getUUID(), killer.tickCount, COMBAT_WINDOW_TICKS, 0.06F, 1.6F);
+        int out = clampInt(Math.round(xp * mult), 1, 120);
+        return skills.addProgress(SkillCategory.COMBAT, out);
     }
 
-    public static boolean awardUtilityBlock(PlayerSkills skills) {
-        skills.addPoints(SkillCategory.UTILITY, 1);
-        return true;
+    public static boolean awardUtilityBlock(ServerPlayer player, PlayerSkills skills, BlockState state, LevelAccessor level, BlockPos pos) {
+        if (player == null || state == null) return false;
+        int xp = utilityBlockXp(state, level, pos);
+        if (xp <= 0) return false;
+        float mult = streakMultiplier(UTILITY_STREAK, player.getUUID(), player.tickCount, UTILITY_WINDOW_TICKS, 0.03F, 1.35F);
+        int out = clampInt(Math.round(xp * mult), 1, 60);
+        return skills.addProgress(SkillCategory.UTILITY, out);
     }
 
-    public static boolean awardSurvivalEvaded(PlayerSkills skills, float evaded) {
-        if (evaded <= 0.0F) return false;
-        int pts = (int) (evaded / 2.0F);
-        if (pts <= 0) return false;
-        skills.addPoints(SkillCategory.SURVIVAL, pts);
-        return true;
+    public static boolean awardSurvivalPrevented(PlayerSkills skills, float preventedBySkills) {
+        int xp = survivalPreventedXp(preventedBySkills);
+        if (xp <= 0) return false;
+        return skills.addProgress(SkillCategory.SURVIVAL, xp);
+    }
+
+    public static int combatKillXp(LivingEntity victim) {
+        int hp = (int) Math.ceil(Math.max(1.0F, victim.getMaxHealth()));
+        int armor = Math.max(0, victim.getArmorValue());
+
+        float catMult = 1.0F;
+        MobCategory cat = victim.getType().getCategory();
+        if (cat == MobCategory.MONSTER) catMult = 1.0F;
+        else if (cat == MobCategory.CREATURE) catMult = 0.35F;
+        else if (cat == MobCategory.WATER_CREATURE) catMult = 0.45F;
+        else if (cat == MobCategory.AMBIENT) catMult = 0.15F;
+        else catMult = 0.20F;
+
+        int base = 6 + (hp / 4) + (armor / 2);
+        int xp = Math.round(base * catMult);
+        return clampInt(xp, 1, 80);
+    }
+
+    public static int utilityBlockXp(BlockState state, LevelAccessor level, BlockPos pos) {
+        float h = state.getDestroySpeed(level, pos);
+        if (h < 0.0F) h = 0.0F;
+        if (h <= 0.0F) return 0;
+        int xp = 1 + (int) Math.floor(h * 1.8F);
+        return clampInt(xp, 1, 28);
+    }
+
+    public static int survivalPreventedXp(float preventedBySkills) {
+        if (preventedBySkills <= 0.0F) return 0;
+        int xp = (int) Math.floor(preventedBySkills * 2.4F);
+        return clampInt(xp, 1, 90);
     }
 
     public static float applyIncomingReductions(ServerPlayer target, PlayerSkills skills, DamageSource src, float amount) {
@@ -110,5 +161,34 @@ public final class SkillLogic {
         if (inst == null) return;
         inst.removeModifier(id);
         if (amount != 0.0D) inst.addTransientModifier(new AttributeModifier(id, amount, op));
+    }
+
+    private static float streakMultiplier(Map<UUID, Streak> map, UUID id, int tick, int window, float per, float cap) {
+        Streak s = map.get(id);
+        if (s == null) {
+            s = new Streak();
+            s.lastTick = tick;
+            s.count = 1;
+            map.put(id, s);
+            return 1.0F;
+        }
+
+        if (tick - s.lastTick <= window) s.count++;
+        else s.count = 1;
+
+        s.lastTick = tick;
+
+        float mult = 1.0F + (Math.max(0, s.count - 1) * per);
+        if (mult > cap) mult = cap;
+        return mult;
+    }
+
+    private static int clampInt(int v, int min, int max) {
+        return Math.max(min, Math.min(max, v));
+    }
+
+    private static final class Streak {
+        int lastTick;
+        int count;
     }
 }

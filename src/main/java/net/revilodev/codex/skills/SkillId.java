@@ -16,7 +16,7 @@ public enum SkillId {
     SWIFTNESS(SkillCategory.SURVIVAL, "Swiftness", ResourceLocation.parse("minecraft:sugar"), "Increases movement speed.", 50),
     DEFENSE(SkillCategory.SURVIVAL, "Defense", ResourceLocation.parse("minecraft:iron_chestplate"), "Increases armor.", 50),
     SATURATION(SkillCategory.SURVIVAL, "Saturation", ResourceLocation.parse("minecraft:cooked_beef"), "Improves hunger/saturation sustain.", 50),
-    LEAPING(SkillCategory.SURVIVAL, "Leaping", ResourceLocation.parse("minecraft:rabbit_foot"), "Increases jump height.", 50),
+    LEAPING(SkillCategory.SURVIVAL, "Leaping", ResourceLocation.parse("minecraft:rabbit_foot"), "Increases jump height.", 12),
 
     EFFICIENCY(SkillCategory.UTILITY, "Efficiency", ResourceLocation.parse("minecraft:iron_pickaxe"), "Increases mining speed.", 50),
     CHOPPING(SkillCategory.UTILITY, "Chopping", ResourceLocation.parse("minecraft:iron_axe"), "Increases chopping speed.", 50),

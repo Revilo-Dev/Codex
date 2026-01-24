@@ -1,4 +1,3 @@
-// src/main/java/net/revilodev/codex/item/ModItems.java
 package net.revilodev.codex.item;
 
 import net.minecraft.world.item.Item;
@@ -8,6 +7,8 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.revilodev.codex.CodexMod;
 
 public final class ModItems {
+    private ModItems() {}
+
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(CodexMod.MOD_ID);
 
     public static final DeferredItem<Item> SKILLS_BOOK =

@@ -131,11 +131,6 @@ public final class SkillDetailsPanel extends AbstractWidget {
         String sub = "Level " + lvl + " / " + skill.maxLevel();
         gg.drawString(mc.font, sub, x + 26, y + 18, 0xA0A0A0, false);
 
-        int ptsColor = (pts <= 0) ? 0xA0A0A0 : 0x55AAFF;
-        String ptsTxt = "Points: " + pts;
-        int ptsW = mc.font.width(ptsTxt);
-        gg.drawString(mc.font, ptsTxt, x + w - ptsW - 2, y + 6, ptsColor, false);
-
         gg.enableScissor(x, contentTop, x + w, contentBottom);
 
         int curY = contentTop + 4 - Mth.floor(scrollY);
@@ -155,6 +150,15 @@ public final class SkillDetailsPanel extends AbstractWidget {
         }
 
         gg.disableScissor();
+
+        // Points: centered just above the upgrade button
+        int ptsColor = (pts <= 0) ? 0xA0A0A0 : 0x55AAFF;
+        String ptsTxt = "Points: " + pts;
+        int ptsW = mc.font.width(ptsTxt);
+        int ptsX = x + (w - ptsW) / 2;
+        int ptsY = upgrade.getY() - mc.font.lineHeight - 2;
+        ptsY = Math.max(ptsY, y + HEADER_HEIGHT + 2);
+        gg.drawString(mc.font, ptsTxt, ptsX, ptsY, ptsColor, false);
 
         boolean canUp = pts > 0 && lvl < skill.maxLevel();
         boolean canDown = lvl > 0;
