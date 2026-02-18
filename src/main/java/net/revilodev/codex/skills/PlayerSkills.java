@@ -7,18 +7,16 @@ import net.neoforged.neoforge.common.util.INBTSerializable;
 import java.util.EnumMap;
 
 public final class PlayerSkills implements INBTSerializable<CompoundTag> {
+    private static final int START_POINTS = 10;
+    private static final double XP_MULT_PER_POINT = 0.02D;
+
     private final EnumMap<SkillCategory, Integer> points = new EnumMap<>(SkillCategory.class);
     private final EnumMap<SkillCategory, Integer> progress = new EnumMap<>(SkillCategory.class);
     private final EnumMap<SkillCategory, Integer> earned = new EnumMap<>(SkillCategory.class);
     private final EnumMap<SkillId, Integer> levels = new EnumMap<>(SkillId.class);
 
     public PlayerSkills() {
-        for (SkillCategory c : SkillCategory.values()) {
-            points.put(c, 0);
-            progress.put(c, 0);
-            earned.put(c, 0);
-        }
-        for (SkillId id : SkillId.values()) levels.put(id, 0);
+        initDefaults();
     }
 
     public int points(SkillCategory c) {
@@ -127,18 +125,13 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     }
 
     public void adminResetCategoryPoints(SkillCategory c) {
-        points.put(c, 0);
+        points.put(c, START_POINTS);
         progress.put(c, 0);
-        earned.put(c, 0);
+        earned.put(c, START_POINTS);
     }
 
     public void adminResetAll() {
-        for (SkillCategory c : SkillCategory.values()) {
-            points.put(c, 0);
-            progress.put(c, 0);
-            earned.put(c, 0);
-        }
-        for (SkillId id : SkillId.values()) levels.put(id, 0);
+        initDefaults();
     }
 
     @Override
@@ -166,14 +159,8 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
 
     @Override
     public void deserializeNBT(HolderLookup.Provider provider, CompoundTag nbt) {
+        initDefaults();
         if (nbt == null) return;
-
-        for (SkillCategory c : SkillCategory.values()) {
-            points.put(c, 0);
-            progress.put(c, 0);
-            earned.put(c, 0);
-        }
-        for (SkillId id : SkillId.values()) levels.put(id, 0);
 
         if (nbt.contains("p")) {
             CompoundTag p = nbt.getCompound("p");
@@ -235,7 +222,21 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         }
 
         if (req < 1L) req = 1L;
-        if (req > Integer.MAX_VALUE) return Integer.MAX_VALUE;
-        return (int) req;
+
+        double mult = 1.0D + (XP_MULT_PER_POINT * e);
+        double scaled = req * mult;
+        if (scaled > Integer.MAX_VALUE) return Integer.MAX_VALUE;
+        int out = (int) Math.round(scaled);
+        if (out < 1) out = 1;
+        return out;
+    }
+
+    private void initDefaults() {
+        for (SkillCategory c : SkillCategory.values()) {
+            points.put(c, START_POINTS);
+            progress.put(c, 0);
+            earned.put(c, START_POINTS);
+        }
+        for (SkillId id : SkillId.values()) levels.put(id, 0);
     }
 }

@@ -3,14 +3,17 @@ package net.revilodev.codex.skills.logic;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.projectile.AbstractArrow;
+import net.minecraft.tags.BlockTags;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingKnockBackEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.revilodev.codex.skills.PlayerSkills;
+import net.revilodev.codex.skills.SkillBalance;
 import net.revilodev.codex.skills.SkillId;
 import net.revilodev.codex.skills.SkillsAttachments;
 
@@ -29,6 +32,7 @@ public final class SkillEvents {
         NeoForge.EVENT_BUS.addListener(SkillEvents::onIncomingDamage);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onFinalDamage);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onKnockback);
+        NeoForge.EVENT_BUS.addListener(SkillEvents::onBreakSpeed);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onPlayerTick);
     }
 
@@ -66,13 +70,15 @@ public final class SkillEvents {
                 boolean projectile = event.getSource().getDirectEntity() instanceof AbstractArrow;
                 if (projectile) {
                     int power = data.level(SkillId.POWER);
-                    if (power > 0) amt += (float) (power * 0.15D);
+                    if (power > 0) amt += (float) (power * SkillBalance.POWER_DAMAGE_PER_LEVEL);
                 } else {
                     int sharp = data.level(SkillId.SHARPNESS);
-                    if (sharp > 0) amt += (float) (sharp * 0.20D);
+                    if (sharp > 0) amt += (float) (sharp * SkillBalance.SHARPNESS_DAMAGE_PER_LEVEL);
 
                     int crit = data.level(SkillId.CRIT_BONUS);
-                    if (crit > 0 && isCritical(attacker)) amt *= (float) (1.0D + crit * 0.01D);
+                    if (crit > 0 && isCritical(attacker)) {
+                        amt *= (float) (1.0D + (crit * SkillBalance.CRIT_BONUS_PCT_PER_LEVEL) / 100.0D);
+                    }
                 }
             }
         }
@@ -120,8 +126,31 @@ public final class SkillEvents {
         int lvl = data.level(SkillId.KNOCKBACK_RESISTANCE);
         if (lvl <= 0) return;
 
-        float scale = (float) Math.max(0.0D, 1.0D - lvl * 0.02D);
+        float scale = (float) Math.max(0.0D, 1.0D - (lvl * SkillBalance.KNOCKBACK_RES_PCT_PER_LEVEL) / 100.0D);
         event.setStrength(event.getStrength() * scale);
+    }
+
+    private static void onBreakSpeed(PlayerEvent.BreakSpeed event) {
+        if (!(event.getEntity() instanceof ServerPlayer sp)) return;
+        if (sp.isSpectator() || sp.isCreative()) return;
+
+        PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
+        int eff = data.level(SkillId.EFFICIENCY);
+        int chop = data.level(SkillId.CHOPPING);
+        if (eff <= 0 && chop <= 0) return;
+
+        float speed = event.getNewSpeed();
+        if (speed <= 0.0F) return;
+
+        float mult = 1.0F;
+        if (eff > 0) {
+            mult += (float) ((eff * SkillBalance.EFFICIENCY_PCT_PER_LEVEL) / 100.0D);
+        }
+        if (chop > 0 && event.getState().is(BlockTags.MINEABLE_WITH_AXE)) {
+            mult += (float) ((chop * SkillBalance.CHOPPING_PCT_PER_LEVEL) / 100.0D);
+        }
+
+        if (mult != 1.0F) event.setNewSpeed(speed * mult);
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {
