@@ -14,6 +14,7 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.revilodev.codex.CodexMod;
+import net.revilodev.codex.client.toast.SkillPointToast;
 import net.revilodev.codex.skills.logic.SkillLogic;
 
 public final class SkillsNetwork {
@@ -50,11 +51,19 @@ public final class SkillsNetwork {
         ctx.enqueueWork(() -> {
             if (ctx.player() == null) return;
 
+            PlayerSkills skills = ctx.player().getData(SkillsAttachments.PLAYER_SKILLS.get());
+            SkillCategory[] cats = SkillCategory.values();
+            int[] before = new int[cats.length];
+            for (int i = 0; i < cats.length; i++) before[i] = skills.earnedPoints(cats[i]);
+
             CompoundTag tag = payload.data();
             if (tag == null) tag = new CompoundTag();
 
-            ctx.player().getData(SkillsAttachments.PLAYER_SKILLS.get())
-                    .deserializeNBT(ctx.player().level().registryAccess(), tag);
+            skills.deserializeNBT(ctx.player().level().registryAccess(), tag);
+
+            if (ctx.player().level().isClientSide()) {
+                ClientOnly.maybeShowSkillPointToasts(skills, cats, before);
+            }
         });
     }
 
@@ -137,6 +146,21 @@ public final class SkillsNetwork {
         private static void openSkillsBook() {
             net.minecraft.client.Minecraft.getInstance()
                     .setScreen(new net.revilodev.codex.client.screen.StandaloneSkillsBookScreen());
+        }
+
+        private static boolean syncedOnce = false;
+
+        private static void maybeShowSkillPointToasts(PlayerSkills skills, SkillCategory[] cats, int[] before) {
+            if (!syncedOnce) {
+                syncedOnce = true;
+                return;
+            }
+
+            for (int i = 0; i < cats.length; i++) {
+                int after = skills.earnedPoints(cats[i]);
+                int delta = after - before[i];
+                if (delta > 0) SkillPointToast.show(cats[i], delta, after);
+            }
         }
     }
 }

@@ -7,8 +7,11 @@ import net.neoforged.neoforge.common.util.INBTSerializable;
 import java.util.EnumMap;
 
 public final class PlayerSkills implements INBTSerializable<CompoundTag> {
-    private static final int START_POINTS = 10;
-    private static final double XP_MULT_PER_POINT = 0.02D;
+    private static final int START_POINTS = 0;
+    private static final int BASE_TASKS_PER_POINT = 10;
+    private static final double TASK_MULTIPLIER = 1.5D;
+    private static final int MAX_STEP_INCREASE = 15;
+    private static final int STEP_ROUND_TO = 5;
 
     private final EnumMap<SkillCategory, Integer> points = new EnumMap<>(SkillCategory.class);
     private final EnumMap<SkillCategory, Integer> progress = new EnumMap<>(SkillCategory.class);
@@ -197,38 +200,22 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     }
 
     private static int requiredXpFor(SkillCategory c, int earnedPoints) {
-        long e = Math.max(0L, (long) earnedPoints);
+        int e = Math.max(0, earnedPoints);
+        int req = BASE_TASKS_PER_POINT;
 
-        long base;
-        long lin;
-        long quad;
-
-        switch (c) {
-            case COMBAT -> { base = 18L; lin = 7L; quad = 2L; }
-            case UTILITY -> { base = 22L; lin = 8L; quad = 3L; }
-            case SURVIVAL -> { base = 20L; lin = 7L; quad = 2L; }
-            default -> { base = 20L; lin = 7L; quad = 2L; }
+        for (int i = 0; i < e; i++) {
+            int projected = (int) Math.floor(req * TASK_MULTIPLIER);
+            int increase = projected - req;
+            if (increase > MAX_STEP_INCREASE) increase = MAX_STEP_INCREASE;
+            req = roundDown(req + increase, STEP_ROUND_TO);
         }
 
-        long req = base + (lin * e) + (quad * e * e);
+        return Math.max(1, req);
+    }
 
-        if (e > 25L) {
-            long d = e - 25L;
-            req += 6L * d * d;
-        }
-        if (e > 60L) {
-            long d = e - 60L;
-            req += 15L * d * d;
-        }
-
-        if (req < 1L) req = 1L;
-
-        double mult = 1.0D + (XP_MULT_PER_POINT * e);
-        double scaled = req * mult;
-        if (scaled > Integer.MAX_VALUE) return Integer.MAX_VALUE;
-        int out = (int) Math.round(scaled);
-        if (out < 1) out = 1;
-        return out;
+    private static int roundDown(int value, int step) {
+        if (step <= 1) return value;
+        return (value / step) * step;
     }
 
     private void initDefaults() {
