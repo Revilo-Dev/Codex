@@ -200,6 +200,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
             case "EFFICIENCY" -> "+" + fmt(level * SkillBalance.EFFICIENCY_PCT_PER_LEVEL) + "% mining speed";
             case "CHOPPING" -> "+" + fmt(level * SkillBalance.CHOPPING_PCT_PER_LEVEL) + "% chopping speed";
             case "FORAGING" -> "+" + fmt(level * SkillBalance.FORAGING_PCT_PER_LEVEL) + "% foraging drops";
+            case "FISHING" -> "+" + fmt(level * SkillBalance.FISHING_PCT_PER_LEVEL) + "% fishing luck";
             case "FORTUNE" -> "+" + fmt(level * SkillBalance.FORTUNE_PCT_PER_LEVEL) + "% chest loot";
             case "LOOTING" -> "+" + fmt(level * SkillBalance.LOOTING_PCT_PER_LEVEL) + "% mob loot";
             default -> "Bonus (level " + level + ")";

@@ -127,6 +127,7 @@ public final class SkillLogic {
         int speed = skills.level(SkillId.SWIFTNESS);
         int kb = skills.level(SkillId.KNOCKBACK_RESISTANCE);
         int foraging = skills.level(SkillId.FORAGING);
+        int fishing = skills.level(SkillId.FISHING);
         int fortune = skills.level(SkillId.FORTUNE);
         int looting = skills.level(SkillId.LOOTING);
 
@@ -148,6 +149,7 @@ public final class SkillLogic {
         );
         double luck =
                 ((foraging * SkillBalance.FORAGING_PCT_PER_LEVEL)
+                        + (fishing * SkillBalance.FISHING_PCT_PER_LEVEL)
                         + (fortune * SkillBalance.FORTUNE_PCT_PER_LEVEL)
                         + (looting * SkillBalance.LOOTING_PCT_PER_LEVEL))
                         * SkillBalance.LUCK_PER_PERCENT;

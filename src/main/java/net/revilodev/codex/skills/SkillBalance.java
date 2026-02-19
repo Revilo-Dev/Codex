@@ -20,6 +20,7 @@ public final class SkillBalance {
     public static final double EFFICIENCY_MAX_PCT = 100.0D;
     public static final double CHOPPING_MAX_PCT = 100.0D;
     public static final double FORAGING_MAX_PCT = 200.0D;
+    public static final double FISHING_MAX_PCT = 100.0D;
     public static final double FORTUNE_MAX_PCT = 200.0D;
     public static final double LOOTING_MAX_PCT = 100.0D;
 
@@ -40,6 +41,7 @@ public final class SkillBalance {
     public static final double EFFICIENCY_PCT_PER_LEVEL = EFFICIENCY_MAX_PCT / SkillId.EFFICIENCY.maxLevel();
     public static final double CHOPPING_PCT_PER_LEVEL = CHOPPING_MAX_PCT / SkillId.CHOPPING.maxLevel();
     public static final double FORAGING_PCT_PER_LEVEL = FORAGING_MAX_PCT / SkillId.FORAGING.maxLevel();
+    public static final double FISHING_PCT_PER_LEVEL = FISHING_MAX_PCT / SkillId.FISHING.maxLevel();
     public static final double FORTUNE_PCT_PER_LEVEL = FORTUNE_MAX_PCT / SkillId.FORTUNE.maxLevel();
     public static final double LOOTING_PCT_PER_LEVEL = LOOTING_MAX_PCT / SkillId.LOOTING.maxLevel();
 

@@ -8,9 +8,10 @@ import net.minecraft.world.item.Items;
 import java.util.Locale;
 
 public enum SkillCategory {
+    UTILITY("utility", "Gathering", ResourceLocation.parse("minecraft:iron_pickaxe")),
     COMBAT("combat", "Combat", ResourceLocation.parse("minecraft:iron_sword")),
-    SURVIVAL("survival", "Survival", ResourceLocation.parse("minecraft:heart_of_the_sea")),
-    UTILITY("utility", "Utility", ResourceLocation.parse("minecraft:iron_pickaxe"));
+    SURVIVAL("survival", "Survival", ResourceLocation.parse("minecraft:iron_chestplate"));
+
 
     public final String id;
     public final String title;
