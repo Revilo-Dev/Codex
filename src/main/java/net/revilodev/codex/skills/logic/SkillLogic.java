@@ -16,7 +16,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillBalance;
-import net.revilodev.codex.skills.SkillCategory;
 import net.revilodev.codex.skills.SkillId;
 
 import java.util.HashMap;
@@ -46,27 +45,26 @@ public final class SkillLogic {
         return skills.tryDowngrade(id);
     }
 
+    public static void clearStreaks(UUID id) {
+        if (id == null) return;
+        COMBAT_STREAK.remove(id);
+        UTILITY_STREAK.remove(id);
+    }
+
     public static boolean awardCombatKill(ServerPlayer killer, PlayerSkills skills, LivingEntity victim) {
         if (killer == null || victim == null) return false;
         int xp = combatKillXp(victim);
         float mult = streakMultiplier(COMBAT_STREAK, killer.getUUID(), killer.tickCount, COMBAT_WINDOW_TICKS, 0.06F, 1.6F);
         int out = clampInt(Math.round(xp * mult), 1, 120);
-        return skills.addProgress(SkillCategory.COMBAT, out);
+        return skills.addProgress(out);
     }
 
     public static boolean awardUtilityBlock(ServerPlayer player, PlayerSkills skills, BlockState state, LevelAccessor level, BlockPos pos) {
-        if (player == null || state == null) return false;
-        int xp = utilityBlockXp(state, level, pos);
-        if (xp <= 0) return false;
-        float mult = streakMultiplier(UTILITY_STREAK, player.getUUID(), player.tickCount, UTILITY_WINDOW_TICKS, 0.03F, 1.35F);
-        int out = clampInt(Math.round(xp * mult), 1, 60);
-        return skills.addProgress(SkillCategory.UTILITY, out);
+        return false;
     }
 
     public static boolean awardSurvivalPrevented(PlayerSkills skills, float preventedBySkills) {
-        int xp = survivalPreventedXp(preventedBySkills);
-        if (xp <= 0) return false;
-        return skills.addProgress(SkillCategory.SURVIVAL, xp);
+        return false;
     }
 
     public static int combatKillXp(LivingEntity victim) {
@@ -122,6 +120,13 @@ public final class SkillLogic {
     }
 
     public static void applyAllEffects(ServerPlayer player, PlayerSkills skills) {
+        if (skills.consumeModifiersDirty()) {
+            applyAttributeModifiers(player, skills);
+        }
+        applyTickEffects(player, skills);
+    }
+
+    private static void applyAttributeModifiers(ServerPlayer player, PlayerSkills skills) {
         int hp = skills.level(SkillId.HEALTH);
         int armor = skills.level(SkillId.DEFENSE);
         int speed = skills.level(SkillId.SWIFTNESS);
@@ -155,6 +160,10 @@ public final class SkillLogic {
                         * SkillBalance.LUCK_PER_PERCENT;
         applyModifier(player, Attributes.LUCK, MOD_LUCK, luck, AttributeModifier.Operation.ADD_VALUE);
 
+        clampToMaxHealth(player);
+    }
+
+    private static void applyTickEffects(ServerPlayer player, PlayerSkills skills) {
         int regen = skills.level(SkillId.REGENERATION);
         if (regen > 0 && player.getHealth() < player.getMaxHealth()) {
             float pct = (float) ((regen * SkillBalance.REGEN_PCT_PER_LEVEL) / 100.0D);
@@ -174,6 +183,10 @@ public final class SkillLogic {
             }
         }
 
+        clampToMaxHealth(player);
+    }
+
+    private static void clampToMaxHealth(ServerPlayer player) {
         if (player.getHealth() > player.getMaxHealth()) player.setHealth(player.getMaxHealth());
     }
 
@@ -190,8 +203,16 @@ public final class SkillLogic {
     private static void applyModifier(ServerPlayer p, net.minecraft.core.Holder<net.minecraft.world.entity.ai.attributes.Attribute> attr, ResourceLocation id, double amount, AttributeModifier.Operation op) {
         AttributeInstance inst = p.getAttribute(attr);
         if (inst == null) return;
+        AttributeModifier existing = inst.getModifier(id);
+        if (amount == 0.0D) {
+            if (existing != null) inst.removeModifier(id);
+            return;
+        }
+        if (existing != null && existing.operation() == op && Double.compare(existing.amount(), amount) == 0) {
+            return;
+        }
         inst.removeModifier(id);
-        if (amount != 0.0D) inst.addTransientModifier(new AttributeModifier(id, amount, op));
+        inst.addTransientModifier(new AttributeModifier(id, amount, op));
     }
 
     private static float streakMultiplier(Map<UUID, Streak> map, UUID id, int tick, int window, float per, float cap) {

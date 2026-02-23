@@ -11,9 +11,11 @@ import net.minecraft.world.item.ItemStack;
 import net.revilodev.codex.skills.SkillCategory;
 
 public final class SkillPointToast implements Toast {
+    private static final Object GLOBAL_TOKEN = new Object();
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/skill_toast.png");
     private static final long DISPLAY_TIME_MS = 5000L;
     private final SkillCategory category;
+    private final Object token;
     private final Component title;
     private Component subtitle;
     private final Item icon;
@@ -22,6 +24,11 @@ public final class SkillPointToast implements Toast {
     private boolean changed;
 
     public SkillPointToast(SkillCategory category, int points, Component title, Component subtitle, Item icon) {
+        this(category, category, points, title, subtitle, icon);
+    }
+
+    private SkillPointToast(Object token, SkillCategory category, int points, Component title, Component subtitle, Item icon) {
+        this.token = token;
         this.category = category;
         this.title = title;
         this.subtitle = subtitle;
@@ -49,6 +56,27 @@ public final class SkillPointToast implements Toast {
         ));
     }
 
+    public static void showGlobal(int delta, int total) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc == null) return;
+        ToastComponent toasts = mc.getToasts();
+        SkillPointToast existing = toasts.getToast(SkillPointToast.class, GLOBAL_TOKEN);
+        if (existing != null) {
+            existing.addPoints(delta);
+            return;
+        }
+
+        String deltaText = delta == 1 ? "+1" : ("+" + delta);
+        toasts.addToast(new SkillPointToast(
+                GLOBAL_TOKEN,
+                SkillCategory.COMBAT,
+                delta,
+                Component.literal("Skill point earned"),
+                Component.literal("Global " + deltaText),
+                SkillCategory.COMBAT.icon()
+        ));
+    }
+
     public Visibility render(GuiGraphics gg, ToastComponent component, long time) {
         if (changed) {
             lastChanged = time;
@@ -66,7 +94,7 @@ public final class SkillPointToast implements Toast {
 
     @Override
     public Object getToken() {
-        return category;
+        return token;
     }
 
     private void addPoints(int delta) {

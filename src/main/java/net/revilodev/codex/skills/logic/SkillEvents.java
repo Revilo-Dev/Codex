@@ -34,6 +34,7 @@ public final class SkillEvents {
         NeoForge.EVENT_BUS.addListener(SkillEvents::onKnockback);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onBreakSpeed);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onPlayerTick);
+        NeoForge.EVENT_BUS.addListener(SkillEvents::onLogout);
     }
 
     private static void onKill(LivingDeathEvent event) {
@@ -160,6 +161,13 @@ public final class SkillEvents {
 
         PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         SkillLogic.applyAllEffects(sp, skills);
+    }
+
+    private static void onLogout(PlayerEvent.PlayerLoggedOutEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer sp)) return;
+        UUID id = sp.getUUID();
+        INCOMING.remove(id);
+        SkillLogic.clearStreaks(id);
     }
 
     private static boolean isCritical(ServerPlayer player) {

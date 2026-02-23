@@ -52,9 +52,7 @@ public final class SkillsNetwork {
             if (ctx.player() == null) return;
 
             PlayerSkills skills = ctx.player().getData(SkillsAttachments.PLAYER_SKILLS.get());
-            SkillCategory[] cats = SkillCategory.values();
-            int[] before = new int[cats.length];
-            for (int i = 0; i < cats.length; i++) before[i] = skills.earnedPoints(cats[i]);
+            int beforeEarned = skills.earnedPoints();
 
             CompoundTag tag = payload.data();
             if (tag == null) tag = new CompoundTag();
@@ -62,7 +60,7 @@ public final class SkillsNetwork {
             skills.deserializeNBT(ctx.player().level().registryAccess(), tag);
 
             if (ctx.player().level().isClientSide()) {
-                ClientOnly.maybeShowSkillPointToasts(skills, cats, before);
+                ClientOnly.maybeShowSkillPointToasts(skills, beforeEarned);
             }
         });
     }
@@ -149,18 +147,22 @@ public final class SkillsNetwork {
         }
 
         private static boolean syncedOnce = false;
+        private static net.minecraft.client.multiplayer.ClientLevel lastLevel;
 
-        private static void maybeShowSkillPointToasts(PlayerSkills skills, SkillCategory[] cats, int[] before) {
+        private static void maybeShowSkillPointToasts(PlayerSkills skills, int beforeEarned) {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc.level != lastLevel) {
+                lastLevel = mc.level;
+                syncedOnce = false;
+            }
             if (!syncedOnce) {
                 syncedOnce = true;
                 return;
             }
 
-            for (int i = 0; i < cats.length; i++) {
-                int after = skills.earnedPoints(cats[i]);
-                int delta = after - before[i];
-                if (delta > 0) SkillPointToast.show(cats[i], delta, after);
-            }
+            int afterEarned = skills.earnedPoints();
+            int delta = afterEarned - beforeEarned;
+            if (delta > 0) SkillPointToast.showGlobal(delta, afterEarned);
         }
     }
 }

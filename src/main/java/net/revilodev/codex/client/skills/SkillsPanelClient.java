@@ -17,6 +17,7 @@ import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.client.SkillsToggleButton;
 import net.revilodev.codex.skills.SkillDefinition;
+import net.revilodev.codex.skills.SkillId;
 import net.revilodev.codex.skills.SkillRegistry;
 
 import java.lang.reflect.Field;
@@ -36,6 +37,10 @@ public final class SkillsPanelClient {
 
     private static final int PANEL_W = 147;
     private static final int PANEL_H = 166;
+    private static final int INNER_PAD_X = 6;
+    private static final int INNER_PAD_TOP = 5;
+    private static final int INNER_PAD_BOTTOM = 6;
+    private static final int SECTION_GAP = 4;
 
     private static final Map<Screen, State> STATES = new WeakHashMap<>();
     private static Field LEFT_FIELD;
@@ -51,7 +56,6 @@ public final class SkillsPanelClient {
         // but we DO NOT force-show when skills is closed (so QuestPanelClient can still hide it).
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, ScreenEvent.Render.Pre.class, SkillsPanelClient::onScreenRenderPre);
 
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, SkillsPanelClient::onScreenRenderPost);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
     }
 
@@ -71,24 +75,19 @@ public final class SkillsPanelClient {
         st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H);
         e.addListener(st.bg);
 
-        st.list = new SkillListWidget(0, 0, 127, PANEL_H - 20, def -> openDetails(st, def));
+        st.list = new SkillListWidget(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2, def -> {
+            if (def != null && st.details != null) st.details.setSkill(def);
+        });
         st.list.setSkills(allSkills());
-        st.list.setCategory(st.selectedCategory);
         e.addListener(st.list);
 
-        st.details = new SkillDetailsPanel(0, 0, 127, PANEL_H - 20, () -> closeDetails(st));
+        st.details = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2, () -> {});
+        st.details.setShowBackButton(false);
+        st.details.setSkill(firstSkill());
         e.addListener(st.details);
         e.addListener(st.details.backButton());
         e.addListener(st.details.upgradeButton());
         e.addListener(st.details.downgradeButton());
-
-        st.tabs = new SkillCategoryTabsWidget(0, 0, 26, PANEL_H, id -> {
-            st.selectedCategory = id;
-            if (st.list != null) st.list.setCategory(id);
-        });
-        st.tabs.setCategories(SkillRegistry.categoriesOrdered());
-        st.tabs.setSelected(st.selectedCategory);
-        e.addListener(st.tabs);
 
         e.addListener(btn);
 
@@ -141,36 +140,27 @@ public final class SkillsPanelClient {
         }
     }
 
-    public static void onScreenRenderPost(ScreenEvent.Render.Post e) {
-        State st = STATES.get(e.getScreen());
-        if (st == null) return;
-        if (st.tabs != null && st.tabs.visible) st.tabs.renderHoverTooltipOnTop(e.getGuiGraphics());
-    }
-
     public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre e) {
         Screen s = e.getScreen();
         State st = STATES.get(s);
         if (st == null || !(s instanceof InventoryScreen inv)) return;
         if (!st.open) return;
 
-        int px = computePanelX(inv) + 10;
-        int py = inv.getGuiTop() + 10;
-        int pw = 127;
-        int ph = PANEL_H - 20;
-
         double mx = e.getMouseX();
         double my = e.getMouseY();
         boolean used = false;
 
         if (st.list != null && st.list.visible) {
-            if (mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
+            if (mx >= st.list.getX() && mx <= st.list.getX() + st.list.getWidth()
+                    && my >= st.list.getY() && my <= st.list.getY() + st.list.getHeight()) {
                 double dY = e.getScrollDeltaY();
                 used = st.list.mouseScrolled(mx, my, dY) || st.list.mouseScrolled(mx, my, 0.0, dY);
             }
         }
 
         if (st.details != null && st.details.visible) {
-            if (mx >= px && mx <= px + pw && my >= py && my <= py + ph) {
+            if (mx >= st.details.getX() && mx <= st.details.getX() + st.details.getWidth()
+                    && my >= st.details.getY() && my <= st.details.getY() + st.details.getHeight()) {
                 double dY = e.getScrollDeltaY();
                 used = st.details.mouseScrolled(mx, my, dY) || st.details.mouseScrolled(mx, my, 0.0, dY) || used;
             }
@@ -189,6 +179,12 @@ public final class SkillsPanelClient {
             @Override public boolean hasNext() { return i < ids.length; }
             @Override public SkillDefinition next() { return SkillRegistry.def(ids[i++]); }
         };
+    }
+
+    private static SkillDefinition firstSkill() {
+        SkillId[] ids = SkillId.values();
+        if (ids.length == 0) return null;
+        return SkillRegistry.def(ids[0]);
     }
 
     private static void toggle(State st) {
@@ -299,36 +295,27 @@ public final class SkillsPanelClient {
         return inv.getGuiLeft() - PANEL_W - 2;
     }
 
-    private static int computeTabsX(InventoryScreen inv) {
-        return computePanelX(inv) - 23;
-    }
-
     private static void setPanelChildBounds(InventoryScreen inv, State st) {
         int bgx = computePanelX(inv);
         int bgy = inv.getGuiTop();
-        int px = bgx + 10;
-        int py = bgy + 10;
-        int pw = 127;
-        int ph = PANEL_H - 20;
+        int innerLeft = bgx + INNER_PAD_X;
+        int innerRight = bgx + PANEL_W - INNER_PAD_X;
+        int innerTop = bgy + INNER_PAD_TOP;
+        int innerBottom = bgy + PANEL_H - INNER_PAD_BOTTOM;
+
+        int listW = SkillListWidget.gridWidth();
+        int listX = bgx + (PANEL_W - listW) / 2;
+        int listY = innerTop;
+        int listH = SkillListWidget.preferredHeight();
+
+        int detailsX = innerLeft;
+        int detailsY = listY + listH + SECTION_GAP;
+        int detailsW = innerRight - innerLeft;
+        int detailsH = Math.max(20, innerBottom - detailsY);
 
         if (st.bg != null) st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
-        if (st.list != null) st.list.setBounds(px, py, pw, ph);
-
-        if (st.details != null) {
-            st.details.setBounds(px, py, pw, ph);
-
-            st.details.backButton().setPosition(px + 2, py + ph - st.details.backButton().getHeight() - 4);
-            st.details.upgradeButton().setPosition(
-                    px + (pw - st.details.upgradeButton().getWidth()) / 2,
-                    py + ph - st.details.upgradeButton().getHeight() - 4
-            );
-            st.details.downgradeButton().setPosition(
-                    px + pw - st.details.downgradeButton().getWidth() - 2,
-                    py + ph - st.details.downgradeButton().getHeight() - 4
-            );
-        }
-
-        if (st.tabs != null) st.tabs.setBounds(computeTabsX(inv), bgy + 4, 26, PANEL_H - 8);
+        if (st.list != null) st.list.setBounds(listX, listY, listW, listH);
+        if (st.details != null) st.details.setBounds(detailsX, detailsY, detailsW, detailsH);
     }
 
     private static void reposition(InventoryScreen inv, State st) {
@@ -372,49 +359,26 @@ public final class SkillsPanelClient {
         throw new NoSuchFieldException("leftPos");
     }
 
-    private static void openDetails(State st, SkillDefinition def) {
-        if (st.details == null || def == null) return;
-        st.details.setSkill(def);
-        st.showingDetails = true;
-        updateVisibility(st);
-    }
-
-    private static void closeDetails(State st) {
-        st.showingDetails = false;
-        updateVisibility(st);
-    }
-
     private static void updateVisibility(State st) {
-        boolean listVisible = st.open && !st.showingDetails;
-        boolean detailsVisible = st.open && st.showingDetails;
-
         if (st.bg != null) {
             st.bg.visible = st.open;
             st.bg.active = st.open;
         }
 
         if (st.list != null) {
-            st.list.visible = listVisible;
-            st.list.active = listVisible;
+            st.list.visible = st.open;
+            st.list.active = st.open;
         }
 
         if (st.details != null) {
-            st.details.visible = detailsVisible;
-            st.details.active = detailsVisible;
-
-            st.details.backButton().visible = detailsVisible;
-            st.details.backButton().active = detailsVisible;
-
-            st.details.upgradeButton().visible = detailsVisible;
-            st.details.upgradeButton().active = detailsVisible;
-
-            st.details.downgradeButton().visible = detailsVisible;
-            st.details.downgradeButton().active = detailsVisible;
-        }
-
-        if (st.tabs != null) {
-            st.tabs.visible = st.open;
-            st.tabs.active = st.open;
+            st.details.visible = st.open;
+            st.details.active = st.open;
+            st.details.backButton().visible = false;
+            st.details.backButton().active = false;
+            st.details.upgradeButton().visible = st.open;
+            st.details.upgradeButton().active = st.open;
+            st.details.downgradeButton().visible = st.open;
+            st.details.downgradeButton().active = st.open;
         }
     }
 
@@ -451,15 +415,12 @@ public final class SkillsPanelClient {
         PanelBackground bg;
         SkillListWidget list;
         SkillDetailsPanel details;
-        SkillCategoryTabsWidget tabs;
 
         ImageButton recipeBtn;
         boolean recipeHiddenBySkills;
 
-        boolean showingDetails;
         boolean open;
         Integer originalLeft;
-        String selectedCategory = "combat";
 
         State(InventoryScreen inv) {
             this.inv = inv;

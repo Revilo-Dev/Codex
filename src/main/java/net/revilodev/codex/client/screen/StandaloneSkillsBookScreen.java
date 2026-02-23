@@ -7,7 +7,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.CodexMod;
-import net.revilodev.codex.client.skills.SkillCategoryTabsWidget;
 import net.revilodev.codex.client.skills.SkillDetailsPanel;
 import net.revilodev.codex.client.skills.SkillListWidget;
 import net.revilodev.codex.skills.SkillDefinition;
@@ -23,16 +22,15 @@ public final class StandaloneSkillsBookScreen extends Screen {
     private final int panelWidth = 147;
     private final int panelHeight = 166;
 
-    private int leftX;
-    private int rightX;
-    private int topY;
+    private int panelX;
+    private int panelY;
 
-    private SkillCategoryTabsWidget tabs;
     private SkillListWidget list;
     private SkillDetailsPanel details;
-
-    private boolean showingDetails = false;
-    private String selectedCategory = "combat";
+    private static final int INNER_PAD_X = 6;
+    private static final int INNER_PAD_TOP = 5;
+    private static final int INNER_PAD_BOTTOM = 6;
+    private static final int SECTION_GAP = 4;
 
     public StandaloneSkillsBookScreen() {
         super(Component.literal("Skills"));
@@ -43,49 +41,37 @@ public final class StandaloneSkillsBookScreen extends Screen {
         int cx = this.width / 2;
         int cy = this.height / 2;
 
-        leftX = cx - panelWidth - 2;
-        rightX = cx + 2;
-        topY = cy - panelHeight / 2;
+        panelX = cx - panelWidth / 2;
+        panelY = cy - panelHeight / 2;
 
-        int pxLeft = leftX + 10;
-        int pxRight = rightX + 10;
-        int py = topY + 10;
-        int pw = 127;
-        int ph = panelHeight - 20;
+        int innerLeft = panelX + INNER_PAD_X;
+        int innerRight = panelX + panelWidth - INNER_PAD_X;
+        int innerTop = panelY + INNER_PAD_TOP;
+        int innerBottom = panelY + panelHeight - INNER_PAD_BOTTOM;
 
-        tabs = new SkillCategoryTabsWidget(leftX - 23, topY + 4, 26, panelHeight - 8, id -> {
-            selectedCategory = id;
-            if (list != null) list.setCategory(id);
-            showingDetails = false;
-            updateVisibility();
-        });
-        tabs.setCategories(SkillRegistry.categoriesOrdered());
-        tabs.setSelected(selectedCategory);
+        int listW = SkillListWidget.gridWidth();
+        int listX = panelX + (panelWidth - listW) / 2;
+        int listY = innerTop;
+        int listH = SkillListWidget.preferredHeight();
 
-        list = new SkillListWidget(pxLeft, py, pw, ph, def -> {
-            if (def == null) return;
-            details.setSkill(def);
-            showingDetails = true;
-            updateVisibility();
+        int detailsX = innerLeft;
+        int detailsY = listY + listH + SECTION_GAP;
+        int detailsW = innerRight - innerLeft;
+        int detailsH = Math.max(20, innerBottom - detailsY);
+
+        list = new SkillListWidget(listX, listY, listW, listH, def -> {
+            if (def != null && details != null) details.setSkill(def);
         });
         list.setSkills(allSkills());
-        list.setCategory(selectedCategory);
-
-        details = new SkillDetailsPanel(pxRight, py, pw, ph, () -> {
-            showingDetails = false;
-            updateVisibility();
-        });
-        details.setBounds(pxRight, py, pw, ph);
-
-        addRenderableWidget(tabs);
         addRenderableWidget(list);
 
+        details = new SkillDetailsPanel(detailsX, detailsY, detailsW, detailsH, () -> {});
+        details.setShowBackButton(false);
+        details.setSkill(firstSkill());
         addRenderableWidget(details);
         addRenderableWidget(details.backButton());
         addRenderableWidget(details.upgradeButton());
         addRenderableWidget(details.downgradeButton());
-
-        updateVisibility();
     }
 
     private Iterable<SkillDefinition> allSkills() {
@@ -98,24 +84,10 @@ public final class StandaloneSkillsBookScreen extends Screen {
         };
     }
 
-    private void updateVisibility() {
-        list.visible = true;
-        list.active = true;
-
-        details.visible = showingDetails;
-        details.active = showingDetails;
-
-        details.backButton().visible = showingDetails;
-        details.backButton().active = showingDetails;
-
-        details.upgradeButton().visible = showingDetails;
-        details.upgradeButton().active = showingDetails;
-
-        details.downgradeButton().visible = showingDetails;
-        details.downgradeButton().active = showingDetails;
-
-        tabs.visible = true;
-        tabs.active = true;
+    private SkillDefinition firstSkill() {
+        SkillId[] ids = SkillId.values();
+        if (ids.length == 0) return null;
+        return SkillRegistry.def(ids[0]);
     }
 
     @Override
@@ -124,8 +96,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
     @Override
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         gg.fill(0, 0, this.width, this.height, 0xA0000000);
-        gg.blit(PANEL_TEX, leftX, topY, 0, 0, panelWidth, panelHeight, panelWidth, panelHeight);
-        gg.blit(PANEL_TEX, rightX, topY, 0, 0, panelWidth, panelHeight, panelWidth, panelHeight);
+        gg.blit(PANEL_TEX, panelX, panelY, 0, 0, panelWidth, panelHeight, panelWidth, panelHeight);
         super.render(gg, mouseX, mouseY, partialTick);
     }
 
@@ -137,8 +108,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
                 if (list.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;
             }
         }
-
-        if (details.visible && details.active) {
+        if (details != null && details.visible && details.active) {
             if (mouseX >= details.getX() && mouseX <= details.getX() + details.getWidth()
                     && mouseY >= details.getY() && mouseY <= details.getY() + details.getHeight()) {
                 if (details.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) return true;

@@ -13,35 +13,56 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     private static final int MAX_STEP_INCREASE = 15;
     private static final int STEP_ROUND_TO = 5;
 
-    private final EnumMap<SkillCategory, Integer> points = new EnumMap<>(SkillCategory.class);
-    private final EnumMap<SkillCategory, Integer> progress = new EnumMap<>(SkillCategory.class);
-    private final EnumMap<SkillCategory, Integer> earned = new EnumMap<>(SkillCategory.class);
+    private int points = START_POINTS;
+    private int progress = 0;
+    private int earned = START_POINTS;
     private final EnumMap<SkillId, Integer> levels = new EnumMap<>(SkillId.class);
+    private boolean modifiersDirty = true;
 
     public PlayerSkills() {
         initDefaults();
     }
 
+    public int points() {
+        return points;
+    }
+
     public int points(SkillCategory c) {
-        return points.getOrDefault(c, 0);
+        return points;
+    }
+
+    public int progress() {
+        return progress;
     }
 
     public int progress(SkillCategory c) {
-        return progress.getOrDefault(c, 0);
+        return progress;
+    }
+
+    public int earnedPoints() {
+        return earned;
     }
 
     public int earnedPoints(SkillCategory c) {
-        return earned.getOrDefault(c, 0);
+        return earned;
+    }
+
+    public int requiredForNextPoint() {
+        return requiredXpFor(earnedPoints());
     }
 
     public int requiredForNextPoint(SkillCategory c) {
-        return requiredXpFor(c, earnedPoints(c));
+        return requiredForNextPoint();
+    }
+
+    public float progressPct() {
+        int req = requiredForNextPoint();
+        if (req <= 0) return 0.0F;
+        return Math.min(1.0F, Math.max(0.0F, progress / (float) req));
     }
 
     public float progressPct(SkillCategory c) {
-        int req = requiredForNextPoint(c);
-        if (req <= 0) return 0.0F;
-        return Math.min(1.0F, Math.max(0.0F, progress(c) / (float) req));
+        return progressPct();
     }
 
     public int level(SkillId id) {
@@ -57,27 +78,31 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     }
 
     public boolean addProgress(SkillCategory c, int xp) {
+        return addProgress(xp);
+    }
+
+    public boolean addProgress(int xp) {
         if (xp <= 0) return false;
 
-        int curXp = progress(c);
+        int curXp = progress;
         int add = xp;
         if (add > Integer.MAX_VALUE - curXp) add = Integer.MAX_VALUE - curXp;
 
         int newXp = curXp + add;
-        int earnedPts = earnedPoints(c);
+        int earnedPts = earned;
 
         while (true) {
-            int req = requiredXpFor(c, earnedPts);
+            int req = requiredXpFor(earnedPts);
             if (req <= 0) req = 1;
             if (newXp < req) break;
 
             newXp -= req;
-            points.put(c, points(c) + 1);
+            points = Math.max(0, points + 1);
             earnedPts++;
         }
 
-        progress.put(c, newXp);
-        earned.put(c, earnedPts);
+        progress = Math.max(0, newXp);
+        earned = Math.max(0, earnedPts);
         return true;
     }
 
@@ -88,12 +113,12 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         int cur = level(id);
         if (cur >= def.maxLevel()) return false;
 
-        SkillCategory c = id.category();
-        int p = points(c);
+        int p = points;
         if (p <= 0) return false;
 
-        points.put(c, p - 1);
+        points = p - 1;
         levels.put(id, cur + 1);
+        modifiersDirty = true;
         return true;
     }
 
@@ -101,15 +126,19 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         int cur = level(id);
         if (cur <= 0) return false;
 
-        SkillCategory c = id.category();
         levels.put(id, cur - 1);
-        points.put(c, points(c) + 1);
+        points = Math.max(0, points + 1);
+        modifiersDirty = true;
         return true;
     }
 
     public void adminAddPoints(SkillCategory c, int amt) {
+        adminAddPoints(amt);
+    }
+
+    public void adminAddPoints(int amt) {
         if (amt <= 0) return;
-        points.put(c, Math.max(0, points(c) + amt));
+        points = Math.max(0, points + amt);
     }
 
     public int adminAddLevel(SkillId id, int amt) {
@@ -123,32 +152,45 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         if (next < 0) next = 0;
         if (next > max) next = max;
 
-        levels.put(id, next);
+        if (next != cur) {
+            levels.put(id, next);
+            modifiersDirty = true;
+        }
         return next;
     }
 
     public void adminResetCategoryPoints(SkillCategory c) {
-        points.put(c, START_POINTS);
-        progress.put(c, 0);
-        earned.put(c, START_POINTS);
+        points = START_POINTS;
+        progress = 0;
+        earned = START_POINTS;
     }
 
     public void adminResetAll() {
         initDefaults();
     }
 
+    public boolean consumeModifiersDirty() {
+        boolean dirty = modifiersDirty;
+        modifiersDirty = false;
+        return dirty;
+    }
+
     @Override
     public CompoundTag serializeNBT(HolderLookup.Provider provider) {
         CompoundTag root = new CompoundTag();
 
+        root.putInt("gp", points);
+        root.putInt("gx", progress);
+        root.putInt("ge", earned);
+
         CompoundTag p = new CompoundTag();
-        for (SkillCategory c : SkillCategory.values()) p.putInt(c.name(), points(c));
+        for (SkillCategory c : SkillCategory.values()) p.putInt(c.name(), points);
 
         CompoundTag x = new CompoundTag();
-        for (SkillCategory c : SkillCategory.values()) x.putInt(c.name(), progress(c));
+        for (SkillCategory c : SkillCategory.values()) x.putInt(c.name(), progress);
 
         CompoundTag e = new CompoundTag();
-        for (SkillCategory c : SkillCategory.values()) e.putInt(c.name(), earnedPoints(c));
+        for (SkillCategory c : SkillCategory.values()) e.putInt(c.name(), earned);
 
         CompoundTag l = new CompoundTag();
         for (SkillId id : SkillId.values()) l.putInt(id.name(), level(id));
@@ -165,11 +207,15 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         initDefaults();
         if (nbt == null) return;
 
-        if (nbt.contains("p")) {
+        if (nbt.contains("gp")) {
+            points = Math.max(0, nbt.getInt("gp"));
+        } else if (nbt.contains("p")) {
             CompoundTag p = nbt.getCompound("p");
+            int total = 0;
             for (SkillCategory c : SkillCategory.values()) {
-                if (p.contains(c.name())) points.put(c, Math.max(0, p.getInt(c.name())));
+                if (p.contains(c.name())) total += Math.max(0, p.getInt(c.name()));
             }
+            points = Math.max(0, total);
         }
 
         if (nbt.contains("l")) {
@@ -179,27 +225,36 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
             }
         }
 
-        if (nbt.contains("x")) {
+        if (nbt.contains("gx")) {
+            progress = Math.max(0, nbt.getInt("gx"));
+        } else if (nbt.contains("x")) {
             CompoundTag x = nbt.getCompound("x");
+            int total = 0;
             for (SkillCategory c : SkillCategory.values()) {
-                if (x.contains(c.name())) progress.put(c, Math.max(0, x.getInt(c.name())));
+                if (x.contains(c.name())) total += Math.max(0, x.getInt(c.name()));
             }
+            progress = Math.max(0, total);
         }
 
-        if (nbt.contains("e")) {
+        if (nbt.contains("ge")) {
+            earned = Math.max(0, nbt.getInt("ge"));
+        } else if (nbt.contains("e")) {
             CompoundTag e = nbt.getCompound("e");
+            int total = 0;
             for (SkillCategory c : SkillCategory.values()) {
-                if (e.contains(c.name())) earned.put(c, Math.max(0, e.getInt(c.name())));
+                if (e.contains(c.name())) total += Math.max(0, e.getInt(c.name()));
             }
+            earned = Math.max(0, total);
         } else {
-            for (SkillCategory c : SkillCategory.values()) {
-                int v = Math.max(0, points(c) + spentIn(c));
-                earned.put(c, v);
-            }
+            int spent = 0;
+            for (SkillCategory c : SkillCategory.values()) spent += spentIn(c);
+            earned = Math.max(0, points + spent);
         }
+
+        modifiersDirty = true;
     }
 
-    private static int requiredXpFor(SkillCategory c, int earnedPoints) {
+    private static int requiredXpFor(int earnedPoints) {
         int e = Math.max(0, earnedPoints);
         int req = BASE_TASKS_PER_POINT;
 
@@ -219,11 +274,10 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     }
 
     private void initDefaults() {
-        for (SkillCategory c : SkillCategory.values()) {
-            points.put(c, START_POINTS);
-            progress.put(c, 0);
-            earned.put(c, START_POINTS);
-        }
+        points = START_POINTS;
+        progress = 0;
+        earned = START_POINTS;
         for (SkillId id : SkillId.values()) levels.put(id, 0);
+        modifiersDirty = true;
     }
 }

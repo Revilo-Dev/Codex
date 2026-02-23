@@ -16,7 +16,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillBalance;
-import net.revilodev.codex.skills.SkillCategory;
 import net.revilodev.codex.skills.SkillDefinition;
 import net.revilodev.codex.skills.SkillsAttachments;
 import net.revilodev.codex.skills.SkillsNetwork;
@@ -24,8 +23,10 @@ import net.revilodev.codex.skills.SkillsNetwork;
 @OnlyIn(Dist.CLIENT)
 public final class SkillDetailsPanel extends AbstractWidget {
 
-    private static final int HEADER_HEIGHT = 28;
+    private static final int HEADER_HEIGHT = 22;
     private static final int BOTTOM_PADDING = 28;
+    private static final float SMALL_TEXT_SCALE = 0.75F;
+    private static final float DESC_TEXT_SCALE = 0.75F;
 
     private static final ResourceLocation TEX_BACK =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_back_button.png");
@@ -53,6 +54,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
     private final UpgradeButton upgrade;
     private final DowngradeButton downgrade;
     private final Runnable onBack;
+    private boolean showBackButton = true;
 
     private float scrollY = 0f;
     private int measuredContentHeight = 0;
@@ -81,6 +83,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
     public AbstractButton backButton() { return back; }
     public AbstractButton upgradeButton() { return upgrade; }
     public AbstractButton downgradeButton() { return downgrade; }
+    public void setShowBackButton(boolean showBackButton) { this.showBackButton = showBackButton; }
 
     public void setBounds(int x, int y, int w, int h) {
         this.setX(x);
@@ -88,12 +91,12 @@ public final class SkillDetailsPanel extends AbstractWidget {
         this.width = w;
         this.height = h;
 
-        int cy = y + h - upgrade.getHeight() - 2;
+        int cy = y + h - upgrade.getHeight() - 3;
         int cxCenter = x + (w - upgrade.getWidth()) / 2;
 
         back.setPosition(x + 2, cy);
         upgrade.setPosition(cxCenter, cy);
-        downgrade.setPosition(x + w - downgrade.getWidth() - 2, cy);
+        downgrade.setPosition(x + w - downgrade.getWidth() - 5, cy);
     }
 
     public void setSkill(SkillDefinition s) {
@@ -110,10 +113,8 @@ public final class SkillDetailsPanel extends AbstractWidget {
         int w = this.width;
 
         PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        SkillCategory cat = skill.category();
-
         int lvl = ps.level(skill.id());
-        int pts = ps.points(cat);
+        int pts = ps.points();
 
         int contentTop = y + HEADER_HEIGHT;
         int contentBottom = upgrade.getY() - 6;
@@ -124,21 +125,28 @@ public final class SkillDetailsPanel extends AbstractWidget {
         scrollY = Mth.clamp(scrollY, 0f, maxScroll);
 
         Item icon = skill.iconItem().orElse(null);
-        if (icon != null) gg.renderItem(new ItemStack(icon), x + 4, y + 4);
+        if (icon != null) gg.renderItem(new ItemStack(icon), x + 4, y + 2);
 
         int nameWidth = w - 32;
-        gg.drawWordWrap(mc.font, Component.literal(skill.title()), x + 26, y + 6, nameWidth, 0xFFFFFF);
+        String title = skill.title();
+        if (mc.font.width(title) > nameWidth) {
+            title = mc.font.plainSubstrByWidth(title, Math.max(0, nameWidth - mc.font.width("..."))) + "...";
+        }
+        gg.drawString(mc.font, title, x + 26, y + 2, 0xFFFFFF, false);
 
         String sub = "Level " + lvl + " / " + skill.maxLevel();
-        gg.drawString(mc.font, sub, x + 26, y + 18, 0xA0A0A0, false);
+        gg.pose().pushPose();
+        gg.pose().translate(x + 26, y + 11, 0.0F);
+        gg.pose().scale(SMALL_TEXT_SCALE, SMALL_TEXT_SCALE, 1.0F);
+        gg.drawString(mc.font, sub, 0, 0, 0xA0A0A0, false);
+        gg.pose().popPose();
 
         gg.enableScissor(x, contentTop, x + w, contentBottom);
 
         int curY = contentTop + 4 - Mth.floor(scrollY);
 
         if (skill.description() != null && !skill.description().isBlank()) {
-            gg.drawWordWrap(mc.font, Component.literal(skill.description()), x + 4, curY, w - 8, 0xCFCFCF);
-            curY += mc.font.wordWrapHeight(skill.description(), w - 8) + 8;
+            curY = drawWrappedScaledText(gg, skill.description(), x + 4, curY, w - 8, 0xCFCFCF, DESC_TEXT_SCALE) + 8;
         }
 
         String eff = effectLine(skill, lvl);
@@ -146,20 +154,10 @@ public final class SkillDetailsPanel extends AbstractWidget {
             gg.drawString(mc.font, "Effect:", x + 4, curY, 0x55AAFF, false);
             curY += mc.font.lineHeight + 2;
 
-            gg.drawWordWrap(mc.font, Component.literal(eff), x + 4, curY, w - 8, 0xCFCFCF);
-            curY += mc.font.wordWrapHeight(eff, w - 8) + 6;
+            curY = drawWrappedScaledText(gg, eff, x + 4, curY, w - 8, 0xCFCFCF, DESC_TEXT_SCALE) + 6;
         }
 
         gg.disableScissor();
-
-        // Points: centered just above the upgrade button
-        int ptsColor = (pts <= 0) ? 0xA0A0A0 : 0x55AAFF;
-        String ptsTxt = "Points: " + pts;
-        int ptsW = mc.font.width(ptsTxt);
-        int ptsX = x + (w - ptsW) / 2;
-        int ptsY = upgrade.getY() - mc.font.lineHeight - 2;
-        ptsY = Math.max(ptsY, y + HEADER_HEIGHT + 2);
-        gg.drawString(mc.font, ptsTxt, ptsX, ptsY, ptsColor, false);
 
         boolean canUp = pts > 0 && lvl < skill.maxLevel();
         boolean canDown = lvl > 0;
@@ -167,13 +165,13 @@ public final class SkillDetailsPanel extends AbstractWidget {
         upgrade.active = canUp;
         downgrade.active = canDown;
 
-        back.visible = true;
-        back.active = true;
+        back.visible = showBackButton;
+        back.active = showBackButton;
 
         upgrade.visible = true;
         downgrade.visible = true;
 
-        back.render(gg, mouseX, mouseY, partialTick);
+        if (showBackButton) back.render(gg, mouseX, mouseY, partialTick);
         upgrade.render(gg, mouseX, mouseY, partialTick);
         downgrade.render(gg, mouseX, mouseY, partialTick);
     }
@@ -219,13 +217,13 @@ public final class SkillDetailsPanel extends AbstractWidget {
         int y = 0;
 
         if (skill.description() != null && !skill.description().isBlank()) {
-            y += mc.font.wordWrapHeight(skill.description(), w - 8) + 8;
+            y += scaledWordWrapHeight(skill.description(), w - 8, DESC_TEXT_SCALE) + 8;
         }
 
         String eff = effectLine(skill, lvl);
         if (!eff.isBlank()) {
             y += mc.font.lineHeight + 2;
-            y += mc.font.wordWrapHeight(eff, w - 8) + 6;
+            y += scaledWordWrapHeight(eff, w - 8, DESC_TEXT_SCALE) + 6;
         }
 
         return y;
@@ -250,6 +248,28 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
         return mouseScrolled(mouseX, mouseY, deltaY);
+    }
+
+    private int drawWrappedScaledText(GuiGraphics gg, String text, int x, int y, int width, int color, float scale) {
+        if (text == null || text.isBlank()) return y;
+        int scaledWidth = Math.max(1, Mth.floor(width / scale));
+        int lineY = y;
+        for (var line : mc.font.split(Component.literal(text), scaledWidth)) {
+            gg.pose().pushPose();
+            gg.pose().translate(x, lineY, 0.0F);
+            gg.pose().scale(scale, scale, 1.0F);
+            gg.drawString(mc.font, line, 0, 0, color, false);
+            gg.pose().popPose();
+            lineY += Math.max(1, Mth.ceil(mc.font.lineHeight * scale));
+        }
+        return lineY;
+    }
+
+    private int scaledWordWrapHeight(String text, int width, float scale) {
+        if (text == null || text.isBlank()) return 0;
+        int scaledWidth = Math.max(1, Mth.floor(width / scale));
+        int lines = mc.font.split(Component.literal(text), scaledWidth).size();
+        return lines * Math.max(1, Mth.ceil(mc.font.lineHeight * scale));
     }
 
     @Override

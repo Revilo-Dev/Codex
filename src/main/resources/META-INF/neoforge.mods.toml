@@ -32,7 +32,7 @@ authors="${mod_authors}" #optional
 description='''${mod_description}'''
 
 # A dependency - use the . to indicate dependency for a specific modid. Dependencies are optional.
-[[dependencies.runic]] #optional
+[[dependencies.${mod_id}]] #optional
 modId="neoforge" #mandatory
 mandatory=true #mandatory
 versionRange="[21.1,)" #mandatory (NeoForge 1.21.1+)
@@ -40,7 +40,7 @@ ordering="NONE"
 side="BOTH"
 
 # Here's another dependency
-[[dependencies.runic]]
+[[dependencies.${mod_id}]]
 modId="minecraft"
 mandatory=true
 versionRange="[1.21.1]" # match the exact Minecraft version
