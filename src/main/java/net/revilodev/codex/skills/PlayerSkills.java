@@ -141,6 +141,16 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         points = Math.max(0, points + amt);
     }
 
+    public void adminSetPoints(int amt) {
+        points = Math.max(0, amt);
+    }
+
+    public void adminResetPoints() {
+        points = START_POINTS;
+        progress = 0;
+        earned = START_POINTS;
+    }
+
     public int adminAddLevel(SkillId id, int amt) {
         if (amt <= 0) return level(id);
 
@@ -160,9 +170,7 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     }
 
     public void adminResetCategoryPoints(SkillCategory c) {
-        points = START_POINTS;
-        progress = 0;
-        earned = START_POINTS;
+        adminResetPoints();
     }
 
     public void adminResetAll() {

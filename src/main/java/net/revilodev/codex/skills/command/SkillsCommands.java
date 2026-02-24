@@ -153,6 +153,56 @@ public final class SkillsCommands {
         d.register(Commands.literal("skill")
                 .requires(s -> s.hasPermission(2))
                 .redirect(d.getRoot().getChild("skills")));
+
+        var codex = Commands.literal("codex")
+                .requires(s -> s.hasPermission(2));
+
+        codex.then(Commands.literal("points")
+                .then(Commands.literal("add")
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(1))
+                                .executes(ctx -> {
+                                    ServerPlayer sp = ctx.getSource().getPlayerOrException();
+                                    int amt = IntegerArgumentType.getInteger(ctx, "amount");
+                                    PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
+                                    data.adminAddPoints(amt);
+                                    SkillsNetwork.syncTo(sp);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Added " + amt + " skill points."), true);
+                                    return 1;
+                                })))
+                .then(Commands.literal("set")
+                        .then(Commands.argument("amount", IntegerArgumentType.integer(0))
+                                .executes(ctx -> {
+                                    ServerPlayer sp = ctx.getSource().getPlayerOrException();
+                                    int amt = IntegerArgumentType.getInteger(ctx, "amount");
+                                    PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
+                                    data.adminSetPoints(amt);
+                                    SkillsNetwork.syncTo(sp);
+                                    ctx.getSource().sendSuccess(() -> Component.literal("Set skill points to " + amt + "."), true);
+                                    return 1;
+                                })))
+                .then(Commands.literal("reset")
+                        .executes(ctx -> {
+                            ServerPlayer sp = ctx.getSource().getPlayerOrException();
+                            PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
+                            data.adminResetPoints();
+                            SkillsNetwork.syncTo(sp);
+                            ctx.getSource().sendSuccess(() -> Component.literal("Reset skill points and progress."), true);
+                            return 1;
+                        })));
+
+        codex.then(Commands.literal("skills")
+                .then(Commands.literal("reset")
+                        .executes(ctx -> {
+                            ServerPlayer sp = ctx.getSource().getPlayerOrException();
+                            PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
+                            data.adminResetAll();
+                            SkillLogic.applyAllEffects(sp, data);
+                            SkillsNetwork.syncTo(sp);
+                            ctx.getSource().sendSuccess(() -> Component.literal("Reset all skills, points, and progress."), true);
+                            return 1;
+                        })));
+
+        d.register(codex);
     }
 
     private static SkillId parseSkill(String s) {

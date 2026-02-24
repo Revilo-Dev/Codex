@@ -2,6 +2,7 @@ package net.revilodev.codex.skills.logic;
 
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.projectile.AbstractArrow;
 import net.minecraft.tags.BlockTags;
 import net.neoforged.neoforge.common.NeoForge;
@@ -39,12 +40,14 @@ public final class SkillEvents {
 
     private static void onKill(LivingDeathEvent event) {
         if (event.getEntity().level().isClientSide) return;
+        if (!(event.getEntity() instanceof Mob mob)) return;
         DamageSource src = event.getSource();
         if (!(src.getEntity() instanceof ServerPlayer sp)) return;
         if (sp.isCreative() || sp.isSpectator()) return;
 
         PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        boolean changed = SkillLogic.awardCombatKill(sp, data, event.getEntity());
+        // Uses the existing PlayerSkills progression system (progress -> earned points).
+        boolean changed = SkillLogic.awardCombatKill(sp, data, mob);
         if (changed) SkillSyncEvents.markDirty(sp);
     }
 

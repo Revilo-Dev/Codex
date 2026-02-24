@@ -72,7 +72,7 @@ public final class SkillPointToast implements Toast {
                 SkillCategory.COMBAT,
                 delta,
                 Component.literal("Skill point earned"),
-                Component.literal("Global " + deltaText),
+                Component.literal(deltaText),
                 SkillCategory.COMBAT.icon()
         ));
     }
@@ -101,7 +101,9 @@ public final class SkillPointToast implements Toast {
         if (delta <= 0) return;
         points += delta;
         String deltaText = points == 1 ? "+1" : ("+" + points);
-        subtitle = Component.literal(category.title() + " " + deltaText);
+        subtitle = token == GLOBAL_TOKEN
+                ? Component.literal(deltaText)
+                : Component.literal(category.title() + " " + deltaText);
         changed = true;
     }
 }

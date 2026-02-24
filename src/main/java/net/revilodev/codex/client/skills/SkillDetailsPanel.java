@@ -27,6 +27,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
     private static final int BOTTOM_PADDING = 28;
     private static final float SMALL_TEXT_SCALE = 0.75F;
     private static final float DESC_TEXT_SCALE = 0.75F;
+    private static final float EFFECT_TEXT_SCALE = 0.65F;
 
     private static final ResourceLocation TEX_BACK =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_back_button.png");
@@ -143,7 +144,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
         gg.enableScissor(x, contentTop, x + w, contentBottom);
 
-        int curY = contentTop + 4 - Mth.floor(scrollY);
+        int curY = contentTop + 1 - Mth.floor(scrollY);
 
         if (skill.description() != null && !skill.description().isBlank()) {
             curY = drawWrappedScaledText(gg, skill.description(), x + 4, curY, w - 8, 0xCFCFCF, DESC_TEXT_SCALE) + 8;
@@ -151,10 +152,14 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
         String eff = effectLine(skill, lvl);
         if (!eff.isBlank()) {
-            gg.drawString(mc.font, "Effect:", x + 4, curY, 0x55AAFF, false);
-            curY += mc.font.lineHeight + 2;
+            gg.pose().pushPose();
+            gg.pose().translate(x + 4, curY, 0.0F);
+            gg.pose().scale(EFFECT_TEXT_SCALE, EFFECT_TEXT_SCALE, 1.0F);
+            gg.drawString(mc.font, "Effect:", 0, 0, 0x55AAFF, false);
+            gg.pose().popPose();
+            curY += Math.max(1, Mth.ceil(mc.font.lineHeight * EFFECT_TEXT_SCALE)) + 2;
 
-            curY = drawWrappedScaledText(gg, eff, x + 4, curY, w - 8, 0xCFCFCF, DESC_TEXT_SCALE) + 6;
+            curY = drawWrappedScaledText(gg, eff, x + 4, curY, w - 8, 0xCFCFCF, EFFECT_TEXT_SCALE) + 6;
         }
 
         gg.disableScissor();
@@ -222,8 +227,8 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
         String eff = effectLine(skill, lvl);
         if (!eff.isBlank()) {
-            y += mc.font.lineHeight + 2;
-            y += scaledWordWrapHeight(eff, w - 8, DESC_TEXT_SCALE) + 6;
+            y += Math.max(1, Mth.ceil(mc.font.lineHeight * EFFECT_TEXT_SCALE)) + 2;
+            y += scaledWordWrapHeight(eff, w - 8, EFFECT_TEXT_SCALE) + 6;
         }
 
         return y;

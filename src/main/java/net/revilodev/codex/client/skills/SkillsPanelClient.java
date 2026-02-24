@@ -57,6 +57,8 @@ public final class SkillsPanelClient {
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, ScreenEvent.Render.Pre.class, SkillsPanelClient::onScreenRenderPre);
 
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseDragged.Pre.class, SkillsPanelClient::onMouseDragged);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonReleased.Pre.class, SkillsPanelClient::onMouseReleased);
     }
 
     public static void onScreenInit(ScreenEvent.Init.Post e) {
@@ -167,6 +169,31 @@ public final class SkillsPanelClient {
         }
 
         if (used) e.setCanceled(true);
+    }
+
+    public static void onMouseDragged(ScreenEvent.MouseDragged.Pre e) {
+        Screen s = e.getScreen();
+        State st = STATES.get(s);
+        if (st == null || !(s instanceof InventoryScreen)) return;
+        if (!st.open || st.list == null || !st.list.visible || !st.list.active) return;
+
+        double mx = e.getMouseX();
+        double my = e.getMouseY();
+        boolean insideList = mx >= st.list.getX() && mx <= st.list.getX() + st.list.getWidth()
+                && my >= st.list.getY() && my <= st.list.getY() + st.list.getHeight();
+        if (!insideList) return;
+
+        boolean used = st.list.mouseDragged(mx, my, e.getMouseButton(), e.getDragX(), e.getDragY());
+        if (used) e.setCanceled(true);
+    }
+
+    public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre e) {
+        Screen s = e.getScreen();
+        State st = STATES.get(s);
+        if (st == null || !(s instanceof InventoryScreen)) return;
+        if (!st.open || st.list == null) return;
+
+        st.list.mouseReleased(e.getMouseX(), e.getMouseY(), e.getButton());
     }
 
     private static Iterable<SkillDefinition> allSkills() {

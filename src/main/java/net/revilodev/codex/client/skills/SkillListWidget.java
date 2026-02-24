@@ -44,6 +44,8 @@ public final class SkillListWidget extends AbstractWidget {
     private final Consumer<SkillDefinition> onClick;
 
     private float scrollX = 0;
+    private boolean dragScrollActive = false;
+    private double lastDragMouseX = 0.0;
 
     public SkillListWidget(int x, int y, int w, int h, Consumer<SkillDefinition> onClick) {
         super(x, y, w, h, Component.empty());
@@ -98,7 +100,7 @@ public final class SkillListWidget extends AbstractWidget {
         int ptsColor = (pts <= 0) ? 0xA0A0A0 : 0x55AAFF;
 
         String pointsLabel = "Points: " + pts;
-        gg.drawString(mc.font, pointsLabel, x + 2, y + 2, ptsColor, false);
+        gg.drawString(mc.font, pointsLabel, x + 2, y + 4, ptsColor, false);
 
         int listTop = y + HEADER_HEIGHT;
         int listH = Math.max(0, height - HEADER_HEIGHT);
@@ -194,14 +196,22 @@ public final class SkillListWidget extends AbstractWidget {
         if (!isMouseOver(mxD, myD)) return false;
         if (mc.player == null) return false;
 
+        dragScrollActive = false;
+        lastDragMouseX = mxD;
+
         int x = getX();
         int y = getY();
         int listTop = y + HEADER_HEIGHT;
         int listH = Math.max(0, height - HEADER_HEIGHT);
         int gridH = Math.min(listH, gridHeight());
+        int content = contentWidth();
+        boolean canScroll = content > width;
 
         int mx = (int) mxD;
         int my = (int) myD;
+        if (my >= listTop && my <= listTop + gridH && canScroll) {
+            dragScrollActive = true;
+        }
         if (my < listTop || my > listTop + gridH) return false;
 
         int localX = (int) (mx - x + scrollX);
@@ -225,6 +235,26 @@ public final class SkillListWidget extends AbstractWidget {
         SkillDefinition clicked = skills.get(idx);
         if (onClick != null) onClick.accept(clicked);
         return true;
+    }
+
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (!visible || !active || button != 0) return false;
+        if (!dragScrollActive) return false;
+
+        int content = contentWidth();
+        if (content <= width) return false;
+
+        float max = content - width;
+        scrollX = Mth.clamp(scrollX - (float) dragX, 0f, max);
+        lastDragMouseX = mouseX;
+        return true;
+    }
+
+    @Override
+    public boolean mouseReleased(double mouseX, double mouseY, int button) {
+        if (button == 0) dragScrollActive = false;
+        return super.mouseReleased(mouseX, mouseY, button);
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {
