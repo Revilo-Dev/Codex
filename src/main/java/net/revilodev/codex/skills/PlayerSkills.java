@@ -5,6 +5,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.neoforged.neoforge.common.util.INBTSerializable;
 
 import java.util.EnumMap;
+import java.util.List;
 
 public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     private static final int START_POINTS = 0;
@@ -40,6 +41,7 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     public boolean tryUpgrade(SkillId id) {
         SkillDefinition def = SkillRegistry.def(id);
         if (def == null) return false;
+        if (!canUnlock(id)) return false;
 
         int cur = level(id);
         if (cur >= def.maxLevel()) return false;
@@ -56,6 +58,7 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     public boolean tryDowngrade(SkillId id) {
         int cur = level(id);
         if (cur <= 0) return false;
+        if (id.primary() && hasInvestedChildren(id)) return false;
 
         levels.put(id, cur - 1);
         points = Math.max(0, points + 1);
@@ -104,6 +107,13 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
 
     public void adminResetAll() {
         initDefaults();
+    }
+
+    public boolean canUnlock(SkillId id) {
+        if (id == null) return false;
+        if (id.primary()) return true;
+        SkillId parent = id.parent();
+        return parent != null && level(parent) > 0;
     }
 
     public boolean consumeModifiersDirty() {
@@ -159,5 +169,13 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         points = START_POINTS;
         for (SkillId id : SkillId.values()) levels.put(id, 0);
         modifiersDirty = true;
+    }
+
+    private boolean hasInvestedChildren(SkillId parent) {
+        List<SkillDefinition> secondaries = SkillRegistry.secondarySkillsFor(parent);
+        for (SkillDefinition def : secondaries) {
+            if (level(def.id()) > 0) return true;
+        }
+        return false;
     }
 }

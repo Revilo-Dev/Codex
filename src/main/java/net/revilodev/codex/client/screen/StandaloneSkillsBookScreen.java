@@ -60,16 +60,15 @@ public final class StandaloneSkillsBookScreen extends Screen {
         int detailsH = Math.max(20, innerBottom - detailsY);
 
         list = new SkillListWidget(listX, listY, listW, listH, def -> {
-            if (def != null && details != null) details.setSkill(def);
+            if (details != null) details.setSkill(def);
+            list.setSelected(def == null ? null : def.id());
         });
         list.setSkills(allSkills());
         addRenderableWidget(list);
 
         details = new SkillDetailsPanel(detailsX, detailsY, detailsW, detailsH, () -> {});
-        details.setShowBackButton(false);
-        details.setSkill(firstSkill());
+        details.setSkill(null);
         addRenderableWidget(details);
-        addRenderableWidget(details.backButton());
         addRenderableWidget(details.upgradeButton());
         addRenderableWidget(details.downgradeButton());
     }
@@ -116,6 +115,20 @@ public final class StandaloneSkillsBookScreen extends Screen {
         }
 
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        boolean used = super.mouseClicked(mouseX, mouseY, button);
+        if (button == 0 && !used && details != null && details.hasSkill()) {
+            boolean inListNode = list != null && list.isOnSkillNode(mouseX, mouseY);
+            boolean onDetailsButton = details.isOnButtons(mouseX, mouseY);
+            if (!inListNode && !onDetailsButton) {
+                details.setSkill(null);
+                if (list != null) list.setSelected(null);
+            }
+        }
+        return used;
     }
 
     @Override

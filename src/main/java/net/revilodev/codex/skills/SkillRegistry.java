@@ -16,7 +16,7 @@ public final class SkillRegistry {
     static {
         for (SkillCategory c : SkillCategory.values()) BY_CATEGORY.put(c, new ArrayList<>());
         for (SkillId id : SkillId.values()) {
-            SkillDefinition def = new SkillDefinition(id, id.category(), id.title(), id.icon(), id.description(), id.maxLevel());
+            SkillDefinition def = new SkillDefinition(id, id.category(), id.primary(), id.parent(), id.title(), id.icon(), id.description(), id.maxLevel());
             DEFINITIONS.put(id, def);
             BY_CATEGORY.get(id.category()).add(def);
         }
@@ -41,9 +41,30 @@ public final class SkillRegistry {
 
     public static List<Category> categoriesOrdered() {
         List<Category> out = new ArrayList<>();
-        out.add(Category.of(SkillCategory.COMBAT));
-        out.add(Category.of(SkillCategory.SURVIVAL));
-        out.add(Category.of(SkillCategory.UTILITY));
+        out.add(Category.of(SkillCategory.STRENGTH));
+        out.add(Category.of(SkillCategory.RESISTANCE));
+        out.add(Category.of(SkillCategory.AGILITY));
+        out.add(Category.of(SkillCategory.VITALITY));
+        out.add(Category.of(SkillCategory.LUCK));
+        return out;
+    }
+
+    public static List<SkillDefinition> primarySkills() {
+        List<SkillDefinition> out = new ArrayList<>();
+        for (SkillId id : SkillId.values()) {
+            SkillDefinition def = def(id);
+            if (def != null && def.primary()) out.add(def);
+        }
+        return out;
+    }
+
+    public static List<SkillDefinition> secondarySkillsFor(SkillId parent) {
+        List<SkillDefinition> out = new ArrayList<>();
+        if (parent == null) return out;
+        for (SkillId id : SkillId.values()) {
+            SkillDefinition def = def(id);
+            if (def != null && def.parent() == parent) out.add(def);
+        }
         return out;
     }
 

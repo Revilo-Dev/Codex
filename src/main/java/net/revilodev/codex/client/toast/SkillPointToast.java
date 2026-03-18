@@ -69,11 +69,11 @@ public final class SkillPointToast implements Toast {
         String deltaText = delta == 1 ? "+1" : ("+" + delta);
         toasts.addToast(new SkillPointToast(
                 GLOBAL_TOKEN,
-                SkillCategory.COMBAT,
+                SkillCategory.STRENGTH,
                 delta,
                 Component.literal("Skill point earned"),
                 Component.literal(deltaText),
-                SkillCategory.COMBAT.icon()
+                SkillCategory.STRENGTH.icon()
         ));
     }
 

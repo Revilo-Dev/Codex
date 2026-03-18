@@ -2,25 +2,21 @@ package net.revilodev.codex.skills.logic;
 
 import com.revilo.levelup.api.LevelUpApi;
 import com.revilo.levelup.api.LevelUpSources;
-import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.tags.DamageTypeTags;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.level.block.state.BlockState;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillBalance;
-import net.revilodev.codex.skills.SkillDefinition;
 import net.revilodev.codex.skills.SkillId;
-import net.revilodev.codex.skills.SkillRegistry;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -29,30 +25,20 @@ import java.util.UUID;
 public final class SkillLogic {
     private SkillLogic() {}
 
-    private static final ResourceLocation MOD_MAX_HEALTH = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_max_health");
-    private static final ResourceLocation MOD_ARMOR = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_armor");
-    private static final ResourceLocation MOD_SPEED = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_speed");
+    private static final ResourceLocation MOD_MAX_HEALTH = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_health_boost");
+    private static final ResourceLocation MOD_ATTACK_SPEED = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_haste");
     private static final ResourceLocation MOD_KB_RES = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_knockback_res");
-    private static final ResourceLocation MOD_LUCK = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_luck");
     private static final ResourceLocation SOURCE_SURVIVAL_PREVENTED = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "survival_prevented");
-
     private static final Map<UUID, Streak> COMBAT_STREAK = new HashMap<>();
-    private static final Map<UUID, Streak> UTILITY_STREAK = new HashMap<>();
-
     private static final int COMBAT_WINDOW_TICKS = 200;
-    private static final int UTILITY_WINDOW_TICKS = 160;
 
     public static boolean tryUpgrade(ServerPlayer player, PlayerSkills skills, SkillId id) {
-        if (player == null) return false;
-        SkillDefinition def = SkillRegistry.def(id);
-        if (def == null) return false;
-
+        if (player == null || id == null) return false;
         int cur = skills.level(id);
-        if (cur >= def.maxLevel()) return false;
-
+        if (cur >= id.maxLevel()) return false;
+        if (!skills.canUnlock(id)) return false;
         int requiredLevel = requiredLevelForNextRank(id, cur);
         if (!LevelUpApi.meetsLevelRequirement(player, requiredLevel)) return false;
-
         return skills.tryUpgrade(id);
     }
 
@@ -61,9 +47,7 @@ public final class SkillLogic {
     }
 
     public static void clearStreaks(UUID id) {
-        if (id == null) return;
-        COMBAT_STREAK.remove(id);
-        UTILITY_STREAK.remove(id);
+        if (id != null) COMBAT_STREAK.remove(id);
     }
 
     public static boolean awardCombatKill(ServerPlayer killer, LivingEntity victim) {
@@ -72,16 +56,6 @@ public final class SkillLogic {
         float mult = streakMultiplier(COMBAT_STREAK, killer.getUUID(), killer.tickCount, COMBAT_WINDOW_TICKS, 0.06F, 1.6F);
         int out = clampInt(Math.round(xp * mult), 1, 120);
         LevelUpApi.awardXp(killer, out, LevelUpSources.MOB_KILL);
-        return true;
-    }
-
-    public static boolean awardUtilityBlock(ServerPlayer player, BlockState state, LevelAccessor level, BlockPos pos) {
-        if (player == null) return false;
-        int xp = utilityBlockXp(state, level, pos);
-        if (xp <= 0) return false;
-        float mult = streakMultiplier(UTILITY_STREAK, player.getUUID(), player.tickCount, UTILITY_WINDOW_TICKS, 0.03F, 1.35F);
-        int out = clampInt(Math.round(xp * mult), 1, 64);
-        LevelUpApi.awardXp(player, out, LevelUpSources.OBJECTIVE_COMPLETE);
         return true;
     }
 
@@ -94,59 +68,39 @@ public final class SkillLogic {
     }
 
     public static int requiredLevelForNextRank(SkillId id, int currentSkillLevel) {
-        int nextRank = Math.max(1, currentSkillLevel + 1);
-        return nextRank;
+        return Math.max(1, currentSkillLevel + 1);
     }
 
     public static int combatKillXp(LivingEntity victim) {
         int hp = (int) Math.ceil(Math.max(1.0F, victim.getMaxHealth()));
         int armor = Math.max(0, victim.getArmorValue());
-
-        float catMult = 1.0F;
+        float catMult;
         MobCategory cat = victim.getType().getCategory();
         if (cat == MobCategory.MONSTER) catMult = 1.0F;
         else if (cat == MobCategory.CREATURE) catMult = 0.35F;
         else if (cat == MobCategory.WATER_CREATURE) catMult = 0.45F;
         else if (cat == MobCategory.AMBIENT) catMult = 0.15F;
         else catMult = 0.20F;
-
         int base = 6 + (hp / 4) + (armor / 2);
-        int xp = Math.round(base * catMult);
-        return clampInt(xp, 1, 80);
-    }
-
-    public static int utilityBlockXp(BlockState state, LevelAccessor level, BlockPos pos) {
-        float h = state.getDestroySpeed(level, pos);
-        if (h < 0.0F) h = 0.0F;
-        if (h <= 0.0F) return 0;
-        int xp = 1 + (int) Math.floor(h * 1.8F);
-        return clampInt(xp, 1, 28);
+        return clampInt(Math.round(base * catMult), 1, 80);
     }
 
     public static int survivalPreventedXp(float preventedBySkills) {
         if (preventedBySkills <= 0.0F) return 0;
-        int xp = (int) Math.floor(preventedBySkills * 2.4F);
-        return clampInt(xp, 1, 90);
+        return clampInt((int) Math.floor(preventedBySkills * 2.4F), 1, 90);
     }
 
     public static float applyIncomingReductions(ServerPlayer target, PlayerSkills skills, DamageSource src, float amount) {
         float out = amount;
-
         int fire = skills.level(SkillId.FIRE_RESISTANCE);
         if (fire > 0 && src.is(DamageTypeTags.IS_FIRE)) {
-            out *= (float) Math.max(0.0D, 1.0D - (fire * SkillBalance.FIRE_RES_PCT_PER_LEVEL) / 100.0D);
-        }
-
-        int blast = skills.level(SkillId.BLAST_RESISTANCE);
-        if (blast > 0 && src.is(DamageTypeTags.IS_EXPLOSION)) {
-            out *= (float) Math.max(0.0D, 1.0D - (blast * SkillBalance.BLAST_RES_PCT_PER_LEVEL) / 100.0D);
+            out *= (float) (1.0D - SkillBalance.fireResistance(fire));
         }
 
         int proj = skills.level(SkillId.PROJECTILE_RESISTANCE);
         if (proj > 0 && src.is(DamageTypeTags.IS_PROJECTILE)) {
-            out *= (float) Math.max(0.0D, 1.0D - (proj * SkillBalance.PROJECTILE_RES_PCT_PER_LEVEL) / 100.0D);
+            out *= (float) (1.0D - SkillBalance.projectileResistance(proj));
         }
-
         return out;
     }
 
@@ -158,60 +112,35 @@ public final class SkillLogic {
     }
 
     private static void applyAttributeModifiers(ServerPlayer player, PlayerSkills skills) {
-        int hp = skills.level(SkillId.HEALTH);
-        int armor = skills.level(SkillId.DEFENSE);
-        int speed = skills.level(SkillId.SWIFTNESS);
+        int healthBoost = skills.level(SkillId.HEALTH_BOOST);
+        int haste = skills.level(SkillId.HASTE);
         int kb = skills.level(SkillId.KNOCKBACK_RESISTANCE);
-        int foraging = skills.level(SkillId.FORAGING);
-        int fishing = skills.level(SkillId.FISHING);
-        int fortune = skills.level(SkillId.FORTUNE);
-        int looting = skills.level(SkillId.LOOTING);
 
-        applyModifier(player, Attributes.MAX_HEALTH, MOD_MAX_HEALTH, hp * SkillBalance.HEALTH_POINTS_PER_LEVEL, AttributeModifier.Operation.ADD_VALUE);
-        applyModifier(player, Attributes.ARMOR, MOD_ARMOR, armor * SkillBalance.DEFENSE_POINTS_PER_LEVEL, AttributeModifier.Operation.ADD_VALUE);
-        applyModifier(
-                player,
-                Attributes.MOVEMENT_SPEED,
-                MOD_SPEED,
-                (speed * SkillBalance.SWIFTNESS_PCT_PER_LEVEL) / 100.0D,
-                AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL
-        );
-        applyModifier(
-                player,
-                Attributes.KNOCKBACK_RESISTANCE,
-                MOD_KB_RES,
-                Math.min(1.0D, (kb * SkillBalance.KNOCKBACK_RES_PCT_PER_LEVEL) / 100.0D),
-                AttributeModifier.Operation.ADD_VALUE
-        );
-        double luck =
-                ((foraging * SkillBalance.FORAGING_PCT_PER_LEVEL)
-                        + (fishing * SkillBalance.FISHING_PCT_PER_LEVEL)
-                        + (fortune * SkillBalance.FORTUNE_PCT_PER_LEVEL)
-                        + (looting * SkillBalance.LOOTING_PCT_PER_LEVEL))
-                        * SkillBalance.LUCK_PER_PERCENT;
-        applyModifier(player, Attributes.LUCK, MOD_LUCK, luck, AttributeModifier.Operation.ADD_VALUE);
-
+        applyModifier(player, Attributes.MAX_HEALTH, MOD_MAX_HEALTH, SkillBalance.healthBoostHearts(healthBoost) * 2.0D, AttributeModifier.Operation.ADD_VALUE);
+        applyModifier(player, Attributes.ATTACK_SPEED, MOD_ATTACK_SPEED, SkillBalance.hasteAttackSpeed(haste), AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        applyModifier(player, Attributes.KNOCKBACK_RESISTANCE, MOD_KB_RES, SkillBalance.knockbackResistance(kb), AttributeModifier.Operation.ADD_VALUE);
         clampToMaxHealth(player);
     }
 
     private static void applyTickEffects(ServerPlayer player, PlayerSkills skills) {
         int regen = skills.level(SkillId.REGENERATION);
         if (regen > 0 && player.getHealth() < player.getMaxHealth()) {
-            float pct = (float) ((regen * SkillBalance.REGEN_PCT_PER_LEVEL) / 100.0D);
-            float heal = SkillBalance.REGEN_HEAL_PER_SECOND_AT_100_PCT * pct;
+            float heal = SkillBalance.regenHeartsPerSecond(regen);
             if (heal > 0.0F) player.heal(heal);
         }
 
         int jump = skills.level(SkillId.LEAPING);
-        if (jump > 0) addIfStronger(player, new MobEffectInstance(net.minecraft.world.effect.MobEffects.JUMP, 220, ampSteps(jump, 10), true, false, false));
+        if (jump > 0) {
+            int amp = Math.max(0, Math.min(4, (int) Math.floor(SkillBalance.leapingBonus(jump))));
+            addIfStronger(player, new MobEffectInstance(MobEffects.JUMP, 220, amp, true, false, false));
+        }
 
-        int sat = skills.level(SkillId.SATURATION);
-        if (sat > 0 && player.tickCount % 40 == 0) {
-            if (player.getFoodData().getFoodLevel() < 20) {
-                float pct = (float) ((sat * SkillBalance.SATURATION_PCT_PER_LEVEL) / 100.0D);
-                float amt = SkillBalance.SATURATION_POINTS_AT_100_PCT * pct;
-                player.getFoodData().eat(0, Math.min(6.0F, amt));
-            }
+        int cleanse = skills.level(SkillId.CLEANSE);
+        if (cleanse > 0 && player.tickCount % 40 == 0 && player.getRandom().nextDouble() < SkillBalance.cleanseChance(cleanse)) {
+            player.getActiveEffects().stream()
+                    .filter(inst -> !inst.getEffect().value().isBeneficial())
+                    .findFirst()
+                    .ifPresent(inst -> player.removeEffect(inst.getEffect()));
         }
 
         clampToMaxHealth(player);
@@ -219,11 +148,6 @@ public final class SkillLogic {
 
     private static void clampToMaxHealth(ServerPlayer player) {
         if (player.getHealth() > player.getMaxHealth()) player.setHealth(player.getMaxHealth());
-    }
-
-    private static int ampSteps(int level, int perAmp) {
-        int a = (level - 1) / perAmp;
-        return Math.max(0, Math.min(4, a));
     }
 
     private static void addIfStronger(ServerPlayer player, MobEffectInstance inst) {
@@ -255,12 +179,9 @@ public final class SkillLogic {
             map.put(id, s);
             return 1.0F;
         }
-
         if (tick - s.lastTick <= window) s.count++;
         else s.count = 1;
-
         s.lastTick = tick;
-
         float mult = 1.0F + (Math.max(0, s.count - 1) * per);
         if (mult > cap) mult = cap;
         return mult;

@@ -57,6 +57,7 @@ public final class SkillsPanelClient {
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, ScreenEvent.Render.Pre.class, SkillsPanelClient::onScreenRenderPre);
 
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonPressed.Pre.class, SkillsPanelClient::onMousePressed);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseDragged.Pre.class, SkillsPanelClient::onMouseDragged);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonReleased.Pre.class, SkillsPanelClient::onMouseReleased);
     }
@@ -78,16 +79,15 @@ public final class SkillsPanelClient {
         e.addListener(st.bg);
 
         st.list = new SkillListWidget(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2, def -> {
-            if (def != null && st.details != null) st.details.setSkill(def);
+            if (st.details != null) st.details.setSkill(def);
+            st.list.setSelected(def == null ? null : def.id());
         });
         st.list.setSkills(allSkills());
         e.addListener(st.list);
 
         st.details = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2, () -> {});
-        st.details.setShowBackButton(false);
-        st.details.setSkill(firstSkill());
+        st.details.setSkill(null);
         e.addListener(st.details);
-        e.addListener(st.details.backButton());
         e.addListener(st.details.upgradeButton());
         e.addListener(st.details.downgradeButton());
 
@@ -185,6 +185,20 @@ public final class SkillsPanelClient {
 
         boolean used = st.list.mouseDragged(mx, my, e.getMouseButton(), e.getDragX(), e.getDragY());
         if (used) e.setCanceled(true);
+    }
+
+    public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre e) {
+        Screen s = e.getScreen();
+        State st = STATES.get(s);
+        if (st == null || !(s instanceof InventoryScreen)) return;
+        if (!st.open || e.getButton() != 0 || st.details == null || !st.details.hasSkill()) return;
+
+        boolean inNode = st.list != null && st.list.isOnSkillNode(e.getMouseX(), e.getMouseY());
+        boolean onButton = st.details.isOnButtons(e.getMouseX(), e.getMouseY());
+        if (!inNode && !onButton) {
+            st.details.setSkill(null);
+            if (st.list != null) st.list.setSelected(null);
+        }
     }
 
     public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre e) {
@@ -400,8 +414,6 @@ public final class SkillsPanelClient {
         if (st.details != null) {
             st.details.visible = st.open;
             st.details.active = st.open;
-            st.details.backButton().visible = false;
-            st.details.backButton().active = false;
             st.details.upgradeButton().visible = st.open;
             st.details.upgradeButton().active = st.open;
             st.details.downgradeButton().visible = st.open;

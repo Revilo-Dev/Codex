@@ -8,9 +8,11 @@ import net.minecraft.world.item.Items;
 import java.util.Locale;
 
 public enum SkillCategory {
-    UTILITY("utility", "Gathering", ResourceLocation.parse("minecraft:iron_pickaxe")),
-    COMBAT("combat", "Combat", ResourceLocation.parse("minecraft:iron_sword")),
-    SURVIVAL("survival", "Survival", ResourceLocation.parse("minecraft:iron_chestplate"));
+    STRENGTH("strength", "Strength", ResourceLocation.parse("minecraft:iron_sword")),
+    RESISTANCE("resistance", "Resistance", ResourceLocation.parse("minecraft:shield")),
+    AGILITY("agility", "Agility", ResourceLocation.parse("minecraft:rabbit_foot")),
+    VITALITY("vitality", "Vitality", ResourceLocation.parse("minecraft:golden_apple")),
+    LUCK("luck", "Luck", ResourceLocation.parse("minecraft:emerald"));
 
 
     public final String id;
@@ -40,9 +42,9 @@ public enum SkillCategory {
     }
 
     public static SkillCategory byId(String id) {
-        if (id == null) return COMBAT;
+        if (id == null) return STRENGTH;
         String s = id.toLowerCase(Locale.ROOT);
         for (SkillCategory c : values()) if (c.id.equals(s)) return c;
-        return COMBAT;
+        return STRENGTH;
     }
 }

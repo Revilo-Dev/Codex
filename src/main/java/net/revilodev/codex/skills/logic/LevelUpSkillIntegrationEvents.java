@@ -4,6 +4,7 @@ import com.revilo.levelup.event.LevelUpLevelChangedEvent;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.skills.PlayerSkills;
+import net.revilodev.codex.skills.SkillConfig;
 import net.revilodev.codex.skills.SkillsAttachments;
 
 public final class LevelUpSkillIntegrationEvents {
@@ -19,7 +20,7 @@ public final class LevelUpSkillIntegrationEvents {
         if (levelsGained <= 0) return;
 
         PlayerSkills skills = player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        skills.adminAddPoints(levelsGained);
+        skills.adminAddPoints(levelsGained * Math.max(0, SkillConfig.pointsPerLevel()));
         SkillSyncEvents.markDirty(player);
     }
 }

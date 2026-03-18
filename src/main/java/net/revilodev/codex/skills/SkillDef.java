@@ -9,13 +9,15 @@ import java.util.Optional;
 public record SkillDef(
         SkillId id,
         SkillCategory category,
+        boolean primary,
+        SkillId parent,
         String title,
         ResourceLocation icon,
         String description,
         int maxLevel
 ) {
     public SkillDef(SkillId id) {
-        this(id, id.category(), id.title(), id.icon(), id.description(), id.maxLevel());
+        this(id, id.category(), id.primary(), id.parent(), id.title(), id.icon(), id.description(), id.maxLevel());
     }
 
     public Optional<Item> iconItem() {

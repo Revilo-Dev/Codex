@@ -9,11 +9,17 @@ import java.util.Optional;
 public record SkillDefinition(
         SkillId id,
         SkillCategory category,
+        boolean primary,
+        SkillId parent,
         String title,
         ResourceLocation icon,
         String description,
         int maxLevel
 ) {
+    public boolean secondary() {
+        return !primary;
+    }
+
     public Optional<Item> iconItem() {
         return BuiltInRegistries.ITEM.getOptional(icon);
     }
