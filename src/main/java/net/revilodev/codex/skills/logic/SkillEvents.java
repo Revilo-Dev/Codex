@@ -13,6 +13,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDropsEvent;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
 import net.neoforged.neoforge.event.entity.living.LivingKnockBackEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent.BreakSpeed;
 import net.neoforged.neoforge.event.level.BlockDropsEvent;
 import net.neoforged.neoforge.event.tick.PlayerTickEvent;
 import net.revilodev.codex.skills.PlayerSkills;
@@ -36,6 +37,7 @@ public final class SkillEvents {
         NeoForge.EVENT_BUS.addListener(SkillEvents::onIncomingDamage);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onFinalDamage);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onKnockback);
+        NeoForge.EVENT_BUS.addListener(SkillEvents::onBreakSpeed);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onPlayerTick);
         NeoForge.EVENT_BUS.addListener(SkillEvents::onLogout);
     }
@@ -66,10 +68,11 @@ public final class SkillEvents {
         PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         int fortune = skills.level(SkillId.FORTUNE);
         if (fortune <= 0) return;
-        double chance = SkillBalance.fortuneChance(fortune);
+        int bonus = SkillBalance.fortuneBonus(fortune);
+        if (bonus <= 0) return;
         for (ItemEntity drop : event.getDrops()) {
             ItemStack stack = drop.getItem();
-            if (!stack.isEmpty() && sp.getRandom().nextDouble() < chance) stack.grow(1);
+            if (!stack.isEmpty()) stack.grow(bonus);
         }
     }
 
@@ -81,12 +84,18 @@ public final class SkillEvents {
             PlayerSkills data = attacker.getData(SkillsAttachments.PLAYER_SKILLS.get());
             boolean projectile = event.getSource().getDirectEntity() instanceof AbstractArrow;
             if (!projectile) {
+                int strength = data.level(SkillId.STRENGTH);
+                if (strength > 0) amt += (float) SkillBalance.strengthDamage(strength);
                 int power = data.level(SkillId.POWER);
                 if (power > 0) amt += (float) SkillBalance.powerDamage(power);
-                int crit = data.level(SkillId.CRIT_POWER);
-                if (crit > 0 && isCritical(attacker)) {
-                    amt *= (float) (1.0D + SkillBalance.critPowerMultiplier(crit));
-                }
+            }
+            int lifeLeach = data.level(SkillId.HEALTH_BOOST);
+            if (lifeLeach > 0 && amt > 0.0F) {
+                attacker.heal((float) (amt * SkillBalance.lifeLeach(lifeLeach)));
+            }
+            int crit = data.level(SkillId.CRIT_POWER);
+            if (crit > 0 && isCritical(attacker)) {
+                amt += (float) SkillBalance.critPowerDamage(crit);
             }
         }
 
@@ -124,6 +133,14 @@ public final class SkillEvents {
         if (lvl <= 0) return;
         float scale = (float) Math.max(0.0D, 1.0D - SkillBalance.knockbackResistance(lvl));
         event.setStrength(event.getStrength() * scale);
+    }
+
+    private static void onBreakSpeed(BreakSpeed event) {
+        if (!(event.getEntity() instanceof ServerPlayer sp)) return;
+        PlayerSkills data = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
+        int haste = data.level(SkillId.HASTE);
+        if (haste <= 0) return;
+        event.setNewSpeed((float) (event.getNewSpeed() + SkillBalance.hasteBreakSpeed(haste)));
     }
 
     private static void onPlayerTick(PlayerTickEvent.Post event) {

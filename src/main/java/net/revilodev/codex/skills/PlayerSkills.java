@@ -22,20 +22,8 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         return points;
     }
 
-    public int points(SkillCategory c) {
-        return points;
-    }
-
     public int level(SkillId id) {
         return levels.getOrDefault(id, 0);
-    }
-
-    public int spentIn(SkillCategory c) {
-        int sum = 0;
-        for (SkillId id : SkillId.values()) {
-            if (id.category() == c) sum += level(id);
-        }
-        return sum;
     }
 
     public boolean tryUpgrade(SkillId id) {
@@ -64,10 +52,6 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         points = Math.max(0, points + 1);
         modifiersDirty = true;
         return true;
-    }
-
-    public void adminAddPoints(SkillCategory c, int amt) {
-        adminAddPoints(amt);
     }
 
     public void adminAddPoints(int amt) {
@@ -101,10 +85,6 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         return next;
     }
 
-    public void adminResetCategoryPoints(SkillCategory c) {
-        adminResetPoints();
-    }
-
     public void adminResetAll() {
         initDefaults();
     }
@@ -125,16 +105,11 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
     @Override
     public CompoundTag serializeNBT(HolderLookup.Provider provider) {
         CompoundTag root = new CompoundTag();
-
         root.putInt("gp", points);
-
-        CompoundTag p = new CompoundTag();
-        for (SkillCategory c : SkillCategory.values()) p.putInt(c.name(), points);
 
         CompoundTag l = new CompoundTag();
         for (SkillId id : SkillId.values()) l.putInt(id.name(), level(id));
 
-        root.put("p", p);
         root.put("l", l);
         return root;
     }

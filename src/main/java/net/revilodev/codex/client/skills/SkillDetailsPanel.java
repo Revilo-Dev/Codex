@@ -1,6 +1,5 @@
 package net.revilodev.codex.client.skills;
 
-import com.revilo.levelup.api.LevelUpApi;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
@@ -48,22 +47,18 @@ public final class SkillDetailsPanel extends AbstractWidget {
     private SkillDefinition skill;
     private final UpgradeButton upgrade;
     private final DowngradeButton downgrade;
-    private final NoopButton back;
     private float scrollY = 0f;
     private int contentHeight = 0;
 
-    public SkillDetailsPanel(int x, int y, int w, int h, Runnable onBack) {
+    public SkillDetailsPanel(int x, int y, int w, int h) {
         super(x, y, w, h, Component.empty());
         this.upgrade = new UpgradeButton(0, 0);
         this.downgrade = new DowngradeButton(0, 0);
-        this.back = new NoopButton(0, 0);
         setBounds(x, y, w, h);
     }
 
-    public AbstractButton backButton() { return back; }
     public AbstractButton upgradeButton() { return upgrade; }
     public AbstractButton downgradeButton() { return downgrade; }
-    public void setShowBackButton(boolean showBackButton) {}
     public boolean hasSkill() { return skill != null; }
 
     public void setBounds(int x, int y, int w, int h) {
@@ -76,7 +71,6 @@ public final class SkillDetailsPanel extends AbstractWidget {
         int start = x + (w - total) / 2;
         upgrade.setPosition(start, by);
         downgrade.setPosition(start + upgrade.getWidth() + 2, by);
-        back.setPosition(x, y);
     }
 
     public void setSkill(SkillDefinition s) {
@@ -89,6 +83,20 @@ public final class SkillDetailsPanel extends AbstractWidget {
     }
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!visible || !active || button != 0) return false;
+        if (upgrade.visible && upgrade.active && upgrade.isMouseOver(mouseX, mouseY)) {
+            upgrade.onPress();
+            return true;
+        }
+        if (downgrade.visible && downgrade.active && downgrade.isMouseOver(mouseX, mouseY)) {
+            downgrade.onPress();
+            return true;
+        }
+        return false;
+    }
+
+    @Override
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible || mc.player == null || skill == null) {
             upgrade.visible = false;
@@ -97,13 +105,10 @@ public final class SkillDetailsPanel extends AbstractWidget {
         }
         PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
         int level = ps.level(skill.id());
-        int reqLevel = SkillLogic.requiredLevelForNextRank(skill.id(), level);
         boolean unlocked = ps.canUnlock(skill.id());
         boolean canUp = unlocked
                 && level < skill.maxLevel()
-                && ps.points() > 0
-                && LevelUpApi.getLevel(mc.player) >= reqLevel
-                && LevelUpApi.meetsLevelRequirement(mc.player, reqLevel);
+                && ps.points() > 0;
         boolean canDown = level > 0;
 
         int x = getX();
@@ -111,7 +116,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
         int w = width;
         int h = height;
 
-        gg.fill(x, y, x + w, y + h, 0xBA303234);
+        gg.fill(x, y, x + w, y + h, 0xEE303234);
         gg.hLine(x, x + w, y, 0xAA5A5A5A);
         gg.blit(skill.icon(), x + 4, y + 4, 0, 0, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE);
         drawScaledText(gg, skill.title(), x + 18, y + 5, 0xFFFFFF, HEADER_TEXT_SCALE);
@@ -126,7 +131,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
         gg.enableScissor(x + 2, viewportTop, x + w - 2, viewportBottom);
         int textY = viewportTop - Mth.floor(scrollY);
-        textY = drawSmallWrapped(gg, "description: " + skill.description(), x + 4, textY, w - 8, 0xE2E2E2) + 4;
+        textY = drawSmallWrapped(gg, skill.description(), x + 4, textY, w - 8, 0xE2E2E2) + 4;
         textY = drawSmallWrapped(gg, "effect: " + effectText(skill, level), x + 4, textY, w - 8, 0xA6D9FF) + 4;
         if (!unlocked) {
             drawSmallWrapped(gg, "requires: " + skill.parent().title() + " level 1", x + 4, textY, w - 8, 0xF0AAAA);
@@ -185,28 +190,34 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
     private int measureContentHeight(SkillDefinition def, boolean unlocked, int level) {
         int scaledWidth = Math.max(1, Mth.floor((width - 8) / SMALL_TEXT_SCALE));
-        int lines = mc.font.split(Component.literal("description: " + def.description()), scaledWidth).size();
+        int lines = mc.font.split(Component.literal(def.description()), scaledWidth).size();
         lines += mc.font.split(Component.literal("effect: " + effectText(def, Math.max(1, level))), scaledWidth).size();
         if (!unlocked) lines += mc.font.split(Component.literal("requires: " + def.parent().title() + " level 1"), scaledWidth).size();
         return lines * Math.max(1, Mth.ceil(mc.font.lineHeight * SMALL_TEXT_SCALE));
     }
 
     private String effectText(SkillDefinition def, int level) {
-        if (level <= 0) return "No bonuses active.";
+        if (level <= 0) {
+            return def.description();
+        }
         return switch (def.id()) {
-            case POWER -> "+" + fmt(SkillBalance.powerDamage(level)) + " melee damage";
-            case CRIT_POWER -> "+" + fmt(SkillBalance.critPowerMultiplier(level) * 100.0D) + "% crit damage";
-            case HASTE -> "+" + fmt(SkillBalance.hasteAttackSpeed(level) * 100.0D) + "% attack speed";
-            case FIRE_RESISTANCE -> "-" + fmt(SkillBalance.fireResistance(level) * 100.0D) + "% fire/lava damage";
-            case PROJECTILE_RESISTANCE -> "-" + fmt(SkillBalance.projectileResistance(level) * 100.0D) + "% projectile damage";
+            case STRENGTH -> "+" + fmt(SkillBalance.strengthDamage(level)) + " damage";
+            case POWER -> "+" + fmt(SkillBalance.powerDamage(level)) + " power";
+            case CRIT_POWER -> "+" + fmt(SkillBalance.critPowerDamage(level)) + " crit power";
+            case HASTE -> "+" + fmt(SkillBalance.hasteBreakSpeed(level)) + " block break speed";
+            case RESISTANCE -> "+" + fmt(SkillBalance.resistance(level) * 100.0D) + "% resistance";
+            case FIRE_RESISTANCE -> "+" + fmt(SkillBalance.fireResistance(level) * 100.0D) + "% fire resistance";
+            case PROJECTILE_RESISTANCE -> "+" + fmt(SkillBalance.projectileResistance(level) * 100.0D) + "% projectile resistance";
             case KNOCKBACK_RESISTANCE -> "+" + fmt(SkillBalance.knockbackResistance(level) * 100.0D) + "% knockback resistance";
+            case AGILITY -> "+" + fmt(SkillBalance.agilitySpeed(level) * 100.0D) + "% speed";
             case LEAPING -> "+" + fmt(SkillBalance.leapingBonus(level) * 100.0D) + "% jump height";
-            case REGENERATION -> "+" + fmt(SkillBalance.regenHeartsPerSecond(level)) + " hearts/sec";
-            case HEALTH_BOOST -> "+" + fmt(SkillBalance.healthBoostHearts(level)) + " hearts";
-            case CLEANSE -> fmt(SkillBalance.cleanseChance(level) * 100.0D) + "% cleanse chance";
-            case LOOTING -> fmt(SkillBalance.lootingChance(level) * 100.0D) + "% extra mob drops";
-            case FORTUNE -> fmt(SkillBalance.fortuneChance(level) * 100.0D) + "% extra block drops";
-            default -> "Unlocks secondary skills.";
+            case VITALITY -> "+" + fmt(SkillBalance.vitalityHearts(level)) + " hearts";
+            case REGENERATION -> "+" + fmt(SkillBalance.regenHeartsPerSecond(level) * 100.0D) + "% regen";
+            case HEALTH_BOOST -> "+" + fmt(SkillBalance.lifeLeach(level) * 100.0D) + "% life steal";
+            case CLEANSE -> "+" + SkillBalance.cleanseImmunities(level) + " negative effect immunity";
+            case LUCK -> "+" + fmt(SkillBalance.luck(level)) + " luck";
+            case LOOTING -> "+" + fmt(SkillBalance.lootingChance(level) * 100.0D) + "% looting";
+            case FORTUNE -> "+" + SkillBalance.fortuneBonus(level) + " fortune";
         };
     }
 
@@ -265,12 +276,5 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
         @Override
         protected void updateWidgetNarration(NarrationElementOutput narration) {}
-    }
-
-    private static final class NoopButton extends AbstractButton {
-        NoopButton(int x, int y) { super(x, y, 1, 1, Component.empty()); visible = false; active = false; }
-        @Override public void onPress() {}
-        @Override protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {}
-        @Override protected void updateWidgetNarration(NarrationElementOutput narration) {}
     }
 }

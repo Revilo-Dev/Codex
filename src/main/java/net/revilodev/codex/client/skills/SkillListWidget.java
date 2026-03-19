@@ -24,15 +24,22 @@ import java.util.function.Consumer;
 public final class SkillListWidget extends AbstractWidget {
     private static final ResourceLocation WIDGET_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget.png");
+    private static final ResourceLocation WIDGET_HOVER_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-hovered.png");
     private static final ResourceLocation WIDGET_DISABLED_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-disabled.png");
     private static final ResourceLocation WIDGET_PRIMARY_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-primary.png");
+    private static final ResourceLocation WIDGET_PRIMARY_DISABLED_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-primary-disabled.png");
+    private static final ResourceLocation WIDGET_PRIMARY_HOVER_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget_primary-hovered.png");
 
     public static final int HEADER_HEIGHT = 11;
     public static final int CELL_SIZE = 23;
     public static final int GAP = 3;
     private static final int ICON_SIZE = 16;
+    private static final float POINTS_TEXT_SCALE = 0.85F;
 
     private final Minecraft mc = Minecraft.getInstance();
     private final Consumer<SkillDefinition> onClick;
@@ -44,7 +51,7 @@ public final class SkillListWidget extends AbstractWidget {
         this.onClick = onClick;
     }
 
-    public void setSkills(Iterable<SkillDefinition> defs) {
+    public void reloadSkills() {
         nodes.clear();
         List<SkillDefinition> primaries = SkillRegistry.primarySkills();
         for (int col = 0; col < primaries.size(); col++) {
@@ -88,7 +95,7 @@ public final class SkillListWidget extends AbstractWidget {
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float pt) {
         if (!visible || mc.player == null) return;
         PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        gg.drawString(mc.font, "Points: " + ps.points(), getX() + 1, getY() + 1, 0x6AB2FF, false);
+        drawScaledText(gg, "Points: " + ps.points(), getX() + 1, getY() + 4, 0x6AB2FF, POINTS_TEXT_SCALE);
 
         int top = getY() + HEADER_HEIGHT;
         RenderSystem.enableBlend();
@@ -96,19 +103,24 @@ public final class SkillListWidget extends AbstractWidget {
             int x = getX() + node.col * (CELL_SIZE + GAP);
             int y = top + node.row * (CELL_SIZE + GAP);
             SkillDefinition def = node.def;
+            boolean hovered = mouseX >= x && mouseX <= x + CELL_SIZE && mouseY >= y && mouseY <= y + CELL_SIZE;
+            boolean learned = ps.level(def.id()) > 0;
 
             boolean unlocked = def.primary() || ps.canUnlock(def.id());
-            ResourceLocation tex = def.primary() ? WIDGET_PRIMARY_TEX : (unlocked ? WIDGET_TEX : WIDGET_DISABLED_TEX);
+            ResourceLocation tex;
+            if (def.primary() && !learned) {
+                tex = WIDGET_PRIMARY_DISABLED_TEX;
+            } else if (!unlocked) {
+                tex = WIDGET_DISABLED_TEX;
+            } else if (def.primary()) {
+                tex = (selected == def.id() || hovered) ? WIDGET_PRIMARY_HOVER_TEX : WIDGET_PRIMARY_TEX;
+            } else {
+                tex = (selected == def.id() || hovered) ? WIDGET_HOVER_TEX : WIDGET_TEX;
+            }
             drawScaledTile(gg, tex, x, y, CELL_SIZE, CELL_SIZE);
             int iconX = x + (CELL_SIZE - ICON_SIZE) / 2;
             int iconY = y + (CELL_SIZE - ICON_SIZE) / 2;
             gg.blit(def.icon(), iconX, iconY, 0, 0, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
-
-            if (selected == def.id()) {
-                gg.fill(x + 1, y + 1, x + CELL_SIZE - 1, y + CELL_SIZE - 1, 0x40FFFFFF);
-            } else if (mouseX >= x && mouseX <= x + CELL_SIZE && mouseY >= y && mouseY <= y + CELL_SIZE) {
-                gg.fill(x + 1, y + 1, x + CELL_SIZE - 1, y + CELL_SIZE - 1, 0x25FFFFFF);
-            }
         }
     }
 
@@ -159,6 +171,14 @@ public final class SkillListWidget extends AbstractWidget {
         gg.pose().translate(x, y, 0.0F);
         gg.pose().scale(w / 26.0F, h / 26.0F, 1.0F);
         gg.blit(tex, 0, 0, 0, 0, 26, 26, 26, 26);
+        gg.pose().popPose();
+    }
+
+    private void drawScaledText(GuiGraphics gg, String text, int x, int y, int color, float scale) {
+        gg.pose().pushPose();
+        gg.pose().translate(x, y, 0.0F);
+        gg.pose().scale(scale, scale, 1.0F);
+        gg.drawString(mc.font, text, 0, 0, color, false);
         gg.pose().popPose();
     }
 

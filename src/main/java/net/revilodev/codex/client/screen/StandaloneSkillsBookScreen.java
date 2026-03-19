@@ -1,6 +1,7 @@
 package net.revilodev.codex.client.screen;
 
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -9,9 +10,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.client.skills.SkillDetailsPanel;
 import net.revilodev.codex.client.skills.SkillListWidget;
-import net.revilodev.codex.skills.SkillDefinition;
-import net.revilodev.codex.skills.SkillId;
-import net.revilodev.codex.skills.SkillRegistry;
+import net.revilodev.codex.client.skills.SkillPanelHeaderRenderer;
 
 @OnlyIn(Dist.CLIENT)
 public final class StandaloneSkillsBookScreen extends Screen {
@@ -30,7 +29,8 @@ public final class StandaloneSkillsBookScreen extends Screen {
     private static final int INNER_PAD_X = 6;
     private static final int INNER_PAD_TOP = 5;
     private static final int INNER_PAD_BOTTOM = 6;
-    private static final int SECTION_GAP = 4;
+    private static final int HEADER_OFFSET_X = 5;
+    private static final int HEADER_OFFSET_Y = 3;
 
     public StandaloneSkillsBookScreen() {
         super(Component.literal("Skills"));
@@ -57,36 +57,20 @@ public final class StandaloneSkillsBookScreen extends Screen {
         int detailsH = panelHeight / 3;
         int detailsW = Math.max(20, (innerRight - innerLeft) - 5);
         int detailsX = innerLeft + 2;
-        int detailsY = panelY + panelHeight - detailsH + 3;
+        int detailsY = panelY + panelHeight - detailsH - 7;
 
         list = new SkillListWidget(listX, listY, listW, listH, def -> {
             if (details != null) details.setSkill(def);
             list.setSelected(def == null ? null : def.id());
         });
-        list.setSkills(allSkills());
+        list.reloadSkills();
         addRenderableWidget(list);
 
-        details = new SkillDetailsPanel(detailsX, detailsY, detailsW, detailsH, () -> {});
+        details = new SkillDetailsPanel(detailsX, detailsY, detailsW, detailsH);
         details.setSkill(null);
         addRenderableWidget(details);
         addRenderableWidget(details.upgradeButton());
         addRenderableWidget(details.downgradeButton());
-    }
-
-    private Iterable<SkillDefinition> allSkills() {
-        return () -> new java.util.Iterator<>() {
-            private final SkillId[] ids = SkillId.values();
-            private int i = 0;
-
-            @Override public boolean hasNext() { return i < ids.length; }
-            @Override public SkillDefinition next() { return SkillRegistry.def(ids[i++]); }
-        };
-    }
-
-    private SkillDefinition firstSkill() {
-        SkillId[] ids = SkillId.values();
-        if (ids.length == 0) return null;
-        return SkillRegistry.def(ids[0]);
     }
 
     @Override
@@ -96,6 +80,13 @@ public final class StandaloneSkillsBookScreen extends Screen {
     public void render(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         gg.fill(0, 0, this.width, this.height, 0xA0000000);
         gg.blit(PANEL_TEX, panelX, panelY, 0, 0, panelWidth, panelHeight, panelWidth, panelHeight);
+        SkillPanelHeaderRenderer.draw(
+                gg,
+                Minecraft.getInstance().font,
+                panelX + HEADER_OFFSET_X,
+                panelY - SkillPanelHeaderRenderer.height() + HEADER_OFFSET_Y,
+                "Skills"
+        );
         super.render(gg, mouseX, mouseY, partialTick);
     }
 

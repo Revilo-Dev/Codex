@@ -26,8 +26,9 @@ public final class SkillLogic {
     private SkillLogic() {}
 
     private static final ResourceLocation MOD_MAX_HEALTH = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_health_boost");
-    private static final ResourceLocation MOD_ATTACK_SPEED = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_haste");
+    private static final ResourceLocation MOD_MOVEMENT_SPEED = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_agility");
     private static final ResourceLocation MOD_KB_RES = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_knockback_res");
+    private static final ResourceLocation MOD_LUCK = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "skill_luck");
     private static final ResourceLocation SOURCE_SURVIVAL_PREVENTED = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "survival_prevented");
     private static final Map<UUID, Streak> COMBAT_STREAK = new HashMap<>();
     private static final int COMBAT_WINDOW_TICKS = 200;
@@ -92,6 +93,11 @@ public final class SkillLogic {
 
     public static float applyIncomingReductions(ServerPlayer target, PlayerSkills skills, DamageSource src, float amount) {
         float out = amount;
+        int resistance = skills.level(SkillId.RESISTANCE);
+        if (resistance > 0) {
+            out *= (float) (1.0D - SkillBalance.resistance(resistance));
+        }
+
         int fire = skills.level(SkillId.FIRE_RESISTANCE);
         if (fire > 0 && src.is(DamageTypeTags.IS_FIRE)) {
             out *= (float) (1.0D - SkillBalance.fireResistance(fire));
@@ -112,13 +118,15 @@ public final class SkillLogic {
     }
 
     private static void applyAttributeModifiers(ServerPlayer player, PlayerSkills skills) {
-        int healthBoost = skills.level(SkillId.HEALTH_BOOST);
-        int haste = skills.level(SkillId.HASTE);
+        int vitality = skills.level(SkillId.VITALITY);
+        int agility = skills.level(SkillId.AGILITY);
         int kb = skills.level(SkillId.KNOCKBACK_RESISTANCE);
+        int luck = skills.level(SkillId.LUCK);
 
-        applyModifier(player, Attributes.MAX_HEALTH, MOD_MAX_HEALTH, SkillBalance.healthBoostHearts(healthBoost) * 2.0D, AttributeModifier.Operation.ADD_VALUE);
-        applyModifier(player, Attributes.ATTACK_SPEED, MOD_ATTACK_SPEED, SkillBalance.hasteAttackSpeed(haste), AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
+        applyModifier(player, Attributes.MAX_HEALTH, MOD_MAX_HEALTH, SkillBalance.vitalityHearts(vitality) * 2.0D, AttributeModifier.Operation.ADD_VALUE);
+        applyModifier(player, Attributes.MOVEMENT_SPEED, MOD_MOVEMENT_SPEED, SkillBalance.agilitySpeed(agility), AttributeModifier.Operation.ADD_MULTIPLIED_TOTAL);
         applyModifier(player, Attributes.KNOCKBACK_RESISTANCE, MOD_KB_RES, SkillBalance.knockbackResistance(kb), AttributeModifier.Operation.ADD_VALUE);
+        applyModifier(player, Attributes.LUCK, MOD_LUCK, SkillBalance.luck(luck), AttributeModifier.Operation.ADD_VALUE);
         clampToMaxHealth(player);
     }
 
@@ -136,11 +144,15 @@ public final class SkillLogic {
         }
 
         int cleanse = skills.level(SkillId.CLEANSE);
-        if (cleanse > 0 && player.tickCount % 40 == 0 && player.getRandom().nextDouble() < SkillBalance.cleanseChance(cleanse)) {
-            player.getActiveEffects().stream()
-                    .filter(inst -> !inst.getEffect().value().isBeneficial())
-                    .findFirst()
-                    .ifPresent(inst -> player.removeEffect(inst.getEffect()));
+        if (cleanse > 0 && player.tickCount % 20 == 0) {
+            int removals = SkillBalance.cleanseImmunities(cleanse);
+            if (removals > 0) {
+                player.getActiveEffects().stream()
+                        .filter(inst -> !inst.getEffect().value().isBeneficial())
+                        .limit(removals)
+                        .toList()
+                        .forEach(inst -> player.removeEffect(inst.getEffect()));
+            }
         }
 
         clampToMaxHealth(player);

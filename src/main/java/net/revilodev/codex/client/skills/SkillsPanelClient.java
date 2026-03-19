@@ -16,9 +16,6 @@ import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.client.SkillsToggleButton;
-import net.revilodev.codex.skills.SkillDefinition;
-import net.revilodev.codex.skills.SkillId;
-import net.revilodev.codex.skills.SkillRegistry;
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -40,7 +37,9 @@ public final class SkillsPanelClient {
     private static final int INNER_PAD_X = 6;
     private static final int INNER_PAD_TOP = 5;
     private static final int INNER_PAD_BOTTOM = 6;
-    private static final int SECTION_GAP = 4;
+    private static final int HEADER_OFFSET_X = 5;
+    private static final int HEADER_OFFSET_Y = 3;
+    private static final String HEADER_TEXT = "Skills";
 
     private static final Map<Screen, State> STATES = new WeakHashMap<>();
     private static Field LEFT_FIELD;
@@ -82,10 +81,10 @@ public final class SkillsPanelClient {
             if (st.details != null) st.details.setSkill(def);
             st.list.setSelected(def == null ? null : def.id());
         });
-        st.list.setSkills(allSkills());
+        st.list.reloadSkills();
         e.addListener(st.list);
 
-        st.details = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2, () -> {});
+        st.details = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2);
         st.details.setSkill(null);
         e.addListener(st.details);
         e.addListener(st.details.upgradeButton());
@@ -208,24 +207,6 @@ public final class SkillsPanelClient {
         if (!st.open || st.list == null) return;
 
         st.list.mouseReleased(e.getMouseX(), e.getMouseY(), e.getButton());
-    }
-
-    private static Iterable<SkillDefinition> allSkills() {
-        return () -> net.revilodev.codex.skills.SkillId.values().length == 0
-                ? java.util.Collections.<SkillDefinition>emptyIterator()
-                : new java.util.Iterator<>() {
-            private final net.revilodev.codex.skills.SkillId[] ids = net.revilodev.codex.skills.SkillId.values();
-            private int i = 0;
-
-            @Override public boolean hasNext() { return i < ids.length; }
-            @Override public SkillDefinition next() { return SkillRegistry.def(ids[i++]); }
-        };
-    }
-
-    private static SkillDefinition firstSkill() {
-        SkillId[] ids = SkillId.values();
-        if (ids.length == 0) return null;
-        return SkillRegistry.def(ids[0]);
     }
 
     private static void toggle(State st) {
@@ -352,7 +333,7 @@ public final class SkillsPanelClient {
         int detailsH = PANEL_H / 3;
         int detailsW = Math.max(20, (innerRight - innerLeft) - 5);
         int detailsX = innerLeft + 2;
-        int detailsY = bgy + PANEL_H - detailsH + 3;
+        int detailsY = bgy + PANEL_H - detailsH - 7;
 
         if (st.bg != null) st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
         if (st.list != null) st.list.setBounds(listX, listY, listW, listH);
@@ -437,6 +418,13 @@ public final class SkillsPanelClient {
         protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
             RenderSystem.disableBlend();
             gg.blit(PANEL_TEX, getX(), getY(), 0, 0, width, height, width, height);
+            SkillPanelHeaderRenderer.draw(
+                    gg,
+                    net.minecraft.client.Minecraft.getInstance().font,
+                    getX() + HEADER_OFFSET_X,
+                    getY() - SkillPanelHeaderRenderer.height() + HEADER_OFFSET_Y,
+                    HEADER_TEXT
+            );
         }
 
         @Override

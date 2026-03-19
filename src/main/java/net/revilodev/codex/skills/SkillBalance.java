@@ -3,16 +3,24 @@ package net.revilodev.codex.skills;
 public final class SkillBalance {
     private SkillBalance() {}
 
+    public static double strengthDamage(int level) {
+        return level * SkillConfig.strengthDamagePerLevel();
+    }
+
     public static double powerDamage(int level) {
         return level * SkillConfig.powerDamagePerLevel();
     }
 
-    public static double critPowerMultiplier(int level) {
-        return level * SkillConfig.critPowerPerLevel();
+    public static double critPowerDamage(int level) {
+        return level * SkillConfig.critPowerDamagePerLevel();
     }
 
-    public static double hasteAttackSpeed(int level) {
-        return level * SkillConfig.hastePerLevel();
+    public static double hasteBreakSpeed(int level) {
+        return level * SkillConfig.hasteBreakSpeedPerLevel();
+    }
+
+    public static double resistance(int level) {
+        return clamp(level * SkillConfig.resistancePerLevel(), 0.0D, 0.95D);
     }
 
     public static double fireResistance(int level) {
@@ -27,6 +35,10 @@ public final class SkillBalance {
         return clamp(level * SkillConfig.knockbackResistancePerLevel(), 0.0D, 1.0D);
     }
 
+    public static double agilitySpeed(int level) {
+        return level * SkillConfig.agilitySpeedPerLevel();
+    }
+
     public static double leapingBonus(int level) {
         return level * SkillConfig.leapingPerLevel();
     }
@@ -35,20 +47,28 @@ public final class SkillBalance {
         return (float) (level * SkillConfig.regenHeartsPerLevel());
     }
 
-    public static double healthBoostHearts(int level) {
-        return level * SkillConfig.healthBoostHeartsPerLevel();
+    public static double vitalityHearts(int level) {
+        return level * SkillConfig.vitalityHeartsPerLevel();
     }
 
-    public static double cleanseChance(int level) {
-        return clamp(level * SkillConfig.cleanseChancePerLevel(), 0.0D, 1.0D);
+    public static double lifeLeach(int level) {
+        return clamp(level * SkillConfig.lifeLeachPerLevel(), 0.0D, 1.0D);
+    }
+
+    public static int cleanseImmunities(int level) {
+        return Math.max(0, level * SkillConfig.cleanseImmunitiesPerLevel());
+    }
+
+    public static double luck(int level) {
+        return level * SkillConfig.luckPerLevel();
     }
 
     public static double lootingChance(int level) {
         return clamp(level * SkillConfig.lootingChancePerLevel(), 0.0D, 1.0D);
     }
 
-    public static double fortuneChance(int level) {
-        return clamp(level * SkillConfig.fortuneChancePerLevel(), 0.0D, 1.0D);
+    public static int fortuneBonus(int level) {
+        return Math.max(0, level * SkillConfig.fortuneBonusPerLevel());
     }
 
     private static double clamp(double v, double min, double max) {
