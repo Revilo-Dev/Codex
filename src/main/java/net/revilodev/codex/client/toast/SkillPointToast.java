@@ -57,6 +57,10 @@ public final class SkillPointToast implements Toast {
     }
 
     public static void showGlobal(int delta, int total) {
+        showGlobal(delta, total, Component.literal("Skill point earned"));
+    }
+
+    public static void showGlobal(int delta, int total, Component title) {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return;
         ToastComponent toasts = mc.getToasts();
@@ -71,7 +75,7 @@ public final class SkillPointToast implements Toast {
                 GLOBAL_TOKEN,
                 SkillCategory.STRENGTH,
                 delta,
-                Component.literal("Skill point earned"),
+                title,
                 Component.literal(deltaText),
                 SkillCategory.STRENGTH.icon()
         ));

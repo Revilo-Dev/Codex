@@ -15,20 +15,23 @@ import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.CodexMod;
+import net.revilodev.codex.client.PanelTab;
+import net.revilodev.codex.client.PanelTabButton;
 import net.revilodev.codex.client.SkillsToggleButton;
+import net.revilodev.codex.client.abilities.AbilityDetailsPanel;
+import net.revilodev.codex.client.abilities.AbilityListWidget;
 
 import java.lang.reflect.Field;
 import java.util.Map;
 import java.util.WeakHashMap;
+import java.util.function.Supplier;
 
 @OnlyIn(Dist.CLIENT)
 public final class SkillsPanelClient {
-
     private static final ResourceLocation BTN_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skills_button.png");
     private static final ResourceLocation BTN_TEX_HOVER =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skills_button_hovered.png");
-
     private static final ResourceLocation PANEL_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/skills_panel.png");
 
@@ -39,180 +42,146 @@ public final class SkillsPanelClient {
     private static final int INNER_PAD_BOTTOM = 6;
     private static final int HEADER_OFFSET_X = 5;
     private static final int HEADER_OFFSET_Y = 3;
-    private static final String HEADER_TEXT = "Skills";
 
     private static final Map<Screen, State> STATES = new WeakHashMap<>();
     private static Field LEFT_FIELD;
     private static boolean lastOpen = false;
+    private static PanelTab lastTab = PanelTab.SKILLS;
 
     private SkillsPanelClient() {}
 
     public static void register() {
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, SkillsPanelClient::onScreenInit);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Closing.class, SkillsPanelClient::onScreenClosing);
-
-        // Run LAST so our "hide recipe button while skills open" wins,
-        // but we DO NOT force-show when skills is closed (so QuestPanelClient can still hide it).
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, ScreenEvent.Render.Pre.class, SkillsPanelClient::onScreenRenderPre);
-
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonPressed.Pre.class, SkillsPanelClient::onMousePressed);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseDragged.Pre.class, SkillsPanelClient::onMouseDragged);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonReleased.Pre.class, SkillsPanelClient::onMouseReleased);
     }
 
-    public static void onScreenInit(ScreenEvent.Init.Post e) {
-        Screen s = e.getScreen();
-        if (!(s instanceof InventoryScreen inv)) return;
+    public static void onScreenInit(ScreenEvent.Init.Post event) {
+        Screen screen = event.getScreen();
+        if (!(screen instanceof InventoryScreen inv)) return;
 
         State st = new State(inv);
-        STATES.put(s, st);
+        STATES.put(screen, st);
 
-        int btnX = inv.getGuiLeft() + 145;
-        int btnY = inv.getGuiTop() + 61;
-
-        SkillsToggleButton btn = new SkillsToggleButton(btnX, btnY, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
-        st.btn = btn;
-
-        st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H);
-        e.addListener(st.bg);
-
-        st.list = new SkillListWidget(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2, def -> {
-            if (st.details != null) st.details.setSkill(def);
-            st.list.setSelected(def == null ? null : def.id());
+        st.btn = new SkillsToggleButton(inv.getGuiLeft() + 145, inv.getGuiTop() + 61, BTN_TEX, BTN_TEX_HOVER, () -> toggle(st));
+        st.bg = new PanelBackground(0, 0, PANEL_W, PANEL_H, () -> st.activeTab.title());
+        st.skillsList = new SkillListWidget(0, 0, SkillListWidget.gridWidth(), SkillListWidget.preferredHeight(), def -> {
+            st.skillsDetails.setSkill(def);
+            st.skillsList.setSelected(def == null ? null : def.id());
         });
-        st.list.reloadSkills();
-        e.addListener(st.list);
+        st.skillsList.reloadSkills();
+        st.skillsDetails = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 3);
+        st.abilityList = new AbilityListWidget(0, 0, AbilityListWidget.gridWidth(), AbilityListWidget.preferredHeight(), def -> {
+            st.abilityDetails.setAbility(def);
+            st.abilityList.setSelected(def == null ? null : def.id());
+        });
+        st.abilityDetails = new AbilityDetailsPanel(0, 0, AbilityListWidget.gridWidth(), PANEL_H / 3);
+        st.skillsTab = new PanelTabButton(0, 0, PanelTab.SKILLS, () -> setTab(st, PanelTab.SKILLS));
+        st.abilitiesTab = new PanelTabButton(0, 0, PanelTab.ABILITIES, () -> setTab(st, PanelTab.ABILITIES));
 
-        st.details = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 2);
-        st.details.setSkill(null);
-        e.addListener(st.details);
-        e.addListener(st.details.upgradeButton());
-        e.addListener(st.details.downgradeButton());
-
-        e.addListener(btn);
+        event.addListener(st.bg);
+        event.addListener(st.skillsList);
+        event.addListener(st.skillsDetails);
+        event.addListener(st.skillsDetails.upgradeButton());
+        event.addListener(st.skillsDetails.downgradeButton());
+        event.addListener(st.abilityList);
+        event.addListener(st.abilityDetails);
+        event.addListener(st.abilityDetails.upgradeButton());
+        event.addListener(st.abilityDetails.downgradeButton());
+        event.addListener(st.abilityDetails.bindButton());
+        event.addListener(st.skillsTab);
+        event.addListener(st.abilitiesTab);
+        event.addListener(st.btn);
 
         reposition(inv, st);
-
-        // Cache the vanilla recipe button (your debug shows it is ImageButton 20x18 at 229,98).
         st.recipeBtn = findRecipeButton(inv);
 
         if (lastOpen) {
             st.open = true;
             st.originalLeft = getLeft(inv);
             setLeft(inv, computeCenteredLeft(inv));
-            updateVisibility(st);
-            applySkillsVsRecipePanelRule(inv, st);
-            forceHideRecipeButtonIfSkillsOpen(st);
         }
+        st.activeTab = lastTab;
+        updateVisibility(st);
+        applySkillsVsRecipePanelRule(inv, st);
+        if (st.open) forceHideRecipeButtonIfSkillsOpen(st);
     }
 
-    public static void onScreenClosing(ScreenEvent.Closing e) {
-        State st = STATES.remove(e.getScreen());
+    public static void onScreenClosing(ScreenEvent.Closing event) {
+        State st = STATES.remove(event.getScreen());
         if (st == null) return;
         if (st.open && st.originalLeft != null) {
             setLeft(st.inv, st.originalLeft);
         }
     }
 
-    public static void onScreenRenderPre(ScreenEvent.Render.Pre e) {
-        Screen s = e.getScreen();
-        State st = STATES.get(s);
-        if (st == null || !(s instanceof InventoryScreen inv)) return;
+    public static void onScreenRenderPre(ScreenEvent.Render.Pre event) {
+        Screen screen = event.getScreen();
+        State st = STATES.get(screen);
+        if (st == null || !(screen instanceof InventoryScreen inv)) return;
 
-        if (st.open) {
-            setLeft(inv, computeCenteredLeft(inv));
-        }
-
+        if (st.open) setLeft(inv, computeCenteredLeft(inv));
         reposition(inv, st);
         updateVisibility(st);
         applySkillsVsRecipePanelRule(inv, st);
 
         if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(inv);
-
-        // Key behavior:
-        // - If skills is open -> force-hide recipe button (green book).
-        // - If skills is closed -> DO NOT force-show (QuestPanelClient can hide it when quest open).
-        // - If we previously hid it and skills is now closed -> restore ONLY if quest is not open.
-        if (st.open) {
-            forceHideRecipeButtonIfSkillsOpen(st);
-        } else {
-            restoreRecipeButtonIfWeHidIt(inv, st);
-        }
+        if (st.open) forceHideRecipeButtonIfSkillsOpen(st);
+        else restoreRecipeButtonIfWeHidIt(inv, st);
     }
 
-    public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre e) {
-        Screen s = e.getScreen();
-        State st = STATES.get(s);
-        if (st == null || !(s instanceof InventoryScreen inv)) return;
-        if (!st.open) return;
+    public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre event) {
+        State st = STATES.get(event.getScreen());
+        if (st == null || !st.open) return;
 
-        double mx = e.getMouseX();
-        double my = e.getMouseY();
+        double mx = event.getMouseX();
+        double my = event.getMouseY();
+        double deltaY = event.getScrollDeltaY();
         boolean used = false;
 
-        if (st.list != null && st.list.visible) {
-            if (mx >= st.list.getX() && mx <= st.list.getX() + st.list.getWidth()
-                    && my >= st.list.getY() && my <= st.list.getY() + st.list.getHeight()) {
-                double dY = e.getScrollDeltaY();
-                used = st.list.mouseScrolled(mx, my, dY) || st.list.mouseScrolled(mx, my, 0.0, dY);
+        if (st.activeTab == PanelTab.SKILLS && st.skillsDetails.visible) {
+            used = st.skillsDetails.mouseScrolled(mx, my, deltaY) || st.skillsDetails.mouseScrolled(mx, my, 0.0, deltaY);
+        } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.visible) {
+            used = st.abilityDetails.mouseScrolled(mx, my, deltaY) || st.abilityDetails.mouseScrolled(mx, my, 0.0, deltaY);
+        }
+
+        if (used) event.setCanceled(true);
+    }
+
+    public static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
+    }
+
+    public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre event) {
+        State st = STATES.get(event.getScreen());
+        if (st == null || !st.open || event.getButton() != 0) return;
+
+        if (st.activeTab == PanelTab.SKILLS && st.skillsDetails.hasSkill()) {
+            boolean inNode = st.skillsList.isOnSkillNode(event.getMouseX(), event.getMouseY());
+            boolean onButton = st.skillsDetails.isOnButtons(event.getMouseX(), event.getMouseY());
+            if (!inNode && !onButton) {
+                st.skillsDetails.setSkill(null);
+                st.skillsList.setSelected(null);
+            }
+        } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.hasAbility()) {
+            boolean inNode = st.abilityList.isOnAbilityNode(event.getMouseX(), event.getMouseY());
+            boolean onButton = st.abilityDetails.isOnButtons(event.getMouseX(), event.getMouseY());
+            if (!inNode && !onButton) {
+                st.abilityDetails.setAbility(null);
+                st.abilityList.setSelected(null);
             }
         }
-
-        if (st.details != null && st.details.visible) {
-            if (mx >= st.details.getX() && mx <= st.details.getX() + st.details.getWidth()
-                    && my >= st.details.getY() && my <= st.details.getY() + st.details.getHeight()) {
-                double dY = e.getScrollDeltaY();
-                used = st.details.mouseScrolled(mx, my, dY) || st.details.mouseScrolled(mx, my, 0.0, dY) || used;
-            }
-        }
-
-        if (used) e.setCanceled(true);
     }
 
-    public static void onMouseDragged(ScreenEvent.MouseDragged.Pre e) {
-        Screen s = e.getScreen();
-        State st = STATES.get(s);
-        if (st == null || !(s instanceof InventoryScreen)) return;
-        if (!st.open || st.list == null || !st.list.visible || !st.list.active) return;
-
-        double mx = e.getMouseX();
-        double my = e.getMouseY();
-        boolean insideList = mx >= st.list.getX() && mx <= st.list.getX() + st.list.getWidth()
-                && my >= st.list.getY() && my <= st.list.getY() + st.list.getHeight();
-        if (!insideList) return;
-
-        boolean used = st.list.mouseDragged(mx, my, e.getMouseButton(), e.getDragX(), e.getDragY());
-        if (used) e.setCanceled(true);
-    }
-
-    public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre e) {
-        Screen s = e.getScreen();
-        State st = STATES.get(s);
-        if (st == null || !(s instanceof InventoryScreen)) return;
-        if (!st.open || e.getButton() != 0 || st.details == null || !st.details.hasSkill()) return;
-
-        boolean inNode = st.list != null && st.list.isOnSkillNode(e.getMouseX(), e.getMouseY());
-        boolean onButton = st.details.isOnButtons(e.getMouseX(), e.getMouseY());
-        if (!inNode && !onButton) {
-            st.details.setSkill(null);
-            if (st.list != null) st.list.setSelected(null);
-        }
-    }
-
-    public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre e) {
-        Screen s = e.getScreen();
-        State st = STATES.get(s);
-        if (st == null || !(s instanceof InventoryScreen)) return;
-        if (!st.open || st.list == null) return;
-
-        st.list.mouseReleased(e.getMouseX(), e.getMouseY(), e.getButton());
+    public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
     }
 
     private static void toggle(State st) {
         st.open = !st.open;
         lastOpen = st.open;
-
         if (st.open) {
             if (st.originalLeft == null) st.originalLeft = getLeft(st.inv);
             setLeft(st.inv, computeCenteredLeft(st.inv));
@@ -225,16 +194,16 @@ public final class SkillsPanelClient {
         applySkillsVsRecipePanelRule(st.inv, st);
 
         if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(st.inv);
-
-        if (st.open) {
-            forceHideRecipeButtonIfSkillsOpen(st);
-        } else {
-            restoreRecipeButtonIfWeHidIt(st.inv, st);
-        }
+        if (st.open) forceHideRecipeButtonIfSkillsOpen(st);
+        else restoreRecipeButtonIfWeHidIt(st.inv, st);
     }
 
-    // Keep your old behavior: if vanilla recipe panel is open (left shifted), hide skills toggle.
-    // This does NOT touch the recipe button.
+    private static void setTab(State st, PanelTab tab) {
+        st.activeTab = tab;
+        lastTab = tab;
+        updateVisibility(st);
+    }
+
     private static void applySkillsVsRecipePanelRule(InventoryScreen inv, State st) {
         if (st.open) {
             if (st.btn != null) st.btn.visible = true;
@@ -248,8 +217,6 @@ public final class SkillsPanelClient {
         }
     }
 
-    // ---- recipe button control (green book) ----
-
     private static void forceHideRecipeButtonIfSkillsOpen(State st) {
         if (st.recipeBtn == null) return;
         st.recipeBtn.visible = false;
@@ -259,13 +226,10 @@ public final class SkillsPanelClient {
 
     private static void restoreRecipeButtonIfWeHidIt(InventoryScreen inv, State st) {
         if (!st.recipeHiddenBySkills) return;
-
-        // If quest panel is open, DO NOT restore here; let QuestPanelClient continue hiding/showing.
         if (isQuestPanelOpen(inv)) {
             st.recipeHiddenBySkills = false;
             return;
         }
-
         if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(inv);
         if (st.recipeBtn != null) {
             st.recipeBtn.visible = true;
@@ -276,22 +240,18 @@ public final class SkillsPanelClient {
 
     private static ImageButton findRecipeButton(InventoryScreen inv) {
         for (var child : inv.children()) {
-            if (child instanceof ImageButton btn) {
-                if (btn.getWidth() == 20 && btn.getHeight() == 18) {
-                    return btn;
-                }
+            if (child instanceof ImageButton btn && btn.getWidth() == 20 && btn.getHeight() == 18) {
+                return btn;
             }
         }
         return null;
     }
 
-    // Detect quest panel open without referencing Boundless classes directly (no hard dependency).
-    // Your debug shows QuestPanelClient$PanelBackground exists and is visible=true when quest panel is open.
     private static boolean isQuestPanelOpen(InventoryScreen inv) {
         for (var child : inv.children()) {
             if (child instanceof AbstractWidget w) {
-                String n = child.getClass().getName();
-                if (n.equals("net.revilodev.boundless.client.QuestPanelClient$PanelBackground") && w.visible) {
+                String name = child.getClass().getName();
+                if (name.equals("net.revilodev.boundless.client.QuestPanelClient$PanelBackground") && w.visible) {
                     return true;
                 }
             }
@@ -304,20 +264,18 @@ public final class SkillsPanelClient {
         return inv.getGuiLeft() > centeredLeft + 10;
     }
 
-    // ---- layout ----
-
     private static int computeCenteredLeft(InventoryScreen inv) {
-        int screenW = inv.width;
-        int invW = inv.getXSize();
-        int total = PANEL_W + 2 + invW;
-        return (screenW - total) / 2 + PANEL_W + 2;
+        int total = PANEL_W + 2 + inv.getXSize();
+        return (inv.width - total) / 2 + PANEL_W + 2;
     }
 
     private static int computePanelX(InventoryScreen inv) {
         return inv.getGuiLeft() - PANEL_W - 2;
     }
 
-    private static void setPanelChildBounds(InventoryScreen inv, State st) {
+    private static void reposition(InventoryScreen inv, State st) {
+        if (st.btn != null) st.btn.setPosition(inv.getGuiLeft() + 145, inv.getGuiTop() + 61);
+
         int bgx = computePanelX(inv);
         int bgy = inv.getGuiTop();
         int innerLeft = bgx + INNER_PAD_X;
@@ -328,28 +286,19 @@ public final class SkillsPanelClient {
         int listW = SkillListWidget.gridWidth();
         int listX = bgx + (PANEL_W - listW) / 2;
         int listY = innerTop;
-        int listH = SkillListWidget.preferredHeight();
-
-        int detailsH = PANEL_H / 3;
+        int detailsH = PANEL_H / 3 + 10;
         int detailsW = Math.max(20, (innerRight - innerLeft) - 5);
         int detailsX = innerLeft + 2;
-        int detailsY = bgy + PANEL_H - detailsH - 7;
+        int detailsY = innerBottom - detailsH;
 
-        if (st.bg != null) st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
-        if (st.list != null) st.list.setBounds(listX, listY, listW, listH);
-        if (st.details != null) st.details.setBounds(detailsX, detailsY, detailsW, detailsH);
+        st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
+        st.skillsList.setBounds(listX, listY, listW, SkillListWidget.preferredHeight());
+        st.skillsDetails.setBounds(detailsX, detailsY, detailsW, detailsH);
+        st.abilityList.setBounds(listX, listY, listW, AbilityListWidget.preferredHeight());
+        st.abilityDetails.setBounds(detailsX, detailsY, detailsW, detailsH);
+        st.skillsTab.setPosition(bgx - 32, bgy + 6);
+        st.abilitiesTab.setPosition(bgx - 32, bgy + 34);
     }
-
-    private static void reposition(InventoryScreen inv, State st) {
-        if (st.btn != null) {
-            int x = inv.getGuiLeft() + 145;
-            int y = inv.getGuiTop() + 61;
-            st.btn.setPosition(x, y);
-        }
-        setPanelChildBounds(inv, st);
-    }
-
-    // ---- leftPos reflection ----
 
     private static Integer getLeft(InventoryScreen inv) {
         try {
@@ -382,36 +331,52 @@ public final class SkillsPanelClient {
     }
 
     private static void updateVisibility(State st) {
-        if (st.bg != null) {
-            st.bg.visible = st.open;
-            st.bg.active = st.open;
-        }
+        boolean skillsActive = st.open && st.activeTab == PanelTab.SKILLS;
+        boolean abilitiesActive = st.open && st.activeTab == PanelTab.ABILITIES;
 
-        if (st.list != null) {
-            st.list.visible = st.open;
-            st.list.active = st.open;
-        }
+        st.bg.visible = st.open;
+        st.bg.active = st.open;
+        st.skillsTab.visible = st.open;
+        st.skillsTab.active = st.open;
+        st.skillsTab.setSelected(st.activeTab == PanelTab.SKILLS);
+        st.abilitiesTab.visible = st.open;
+        st.abilitiesTab.active = st.open;
+        st.abilitiesTab.setSelected(st.activeTab == PanelTab.ABILITIES);
 
-        if (st.details != null) {
-            st.details.visible = st.open;
-            st.details.active = st.open;
-            st.details.upgradeButton().visible = st.open;
-            st.details.upgradeButton().active = st.open;
-            st.details.downgradeButton().visible = st.open;
-            st.details.downgradeButton().active = st.open;
-        }
+        st.skillsList.visible = skillsActive;
+        st.skillsList.active = skillsActive;
+        st.skillsDetails.visible = skillsActive;
+        st.skillsDetails.active = skillsActive;
+        st.skillsDetails.upgradeButton().visible = skillsActive;
+        st.skillsDetails.upgradeButton().active = skillsActive;
+        st.skillsDetails.downgradeButton().visible = skillsActive;
+        st.skillsDetails.downgradeButton().active = skillsActive;
+
+        st.abilityList.visible = abilitiesActive;
+        st.abilityList.active = abilitiesActive;
+        st.abilityDetails.visible = abilitiesActive;
+        st.abilityDetails.active = abilitiesActive;
+        st.abilityDetails.upgradeButton().visible = abilitiesActive;
+        st.abilityDetails.upgradeButton().active = abilitiesActive;
+        st.abilityDetails.downgradeButton().visible = abilitiesActive;
+        st.abilityDetails.downgradeButton().active = abilitiesActive;
+        st.abilityDetails.bindButton().visible = abilitiesActive;
+        st.abilityDetails.bindButton().active = abilitiesActive;
     }
 
     private static final class PanelBackground extends AbstractWidget {
-        public PanelBackground(int x, int y, int w, int h) {
+        private final Supplier<String> titleSupplier;
+
+        private PanelBackground(int x, int y, int w, int h, Supplier<String> titleSupplier) {
             super(x, y, w, h, Component.empty());
+            this.titleSupplier = titleSupplier;
         }
 
         public void setBounds(int x, int y, int w, int h) {
-            this.setX(x);
-            this.setY(y);
-            this.width = w;
-            this.height = h;
+            setX(x);
+            setY(y);
+            width = w;
+            height = h;
         }
 
         @Override
@@ -423,13 +388,8 @@ public final class SkillsPanelClient {
                     net.minecraft.client.Minecraft.getInstance().font,
                     getX() + HEADER_OFFSET_X,
                     getY() - SkillPanelHeaderRenderer.height() + HEADER_OFFSET_Y,
-                    HEADER_TEXT
+                    titleSupplier.get()
             );
-        }
-
-        @Override
-        public boolean mouseClicked(double mouseX, double mouseY, int button) {
-            return false;
         }
 
         @Override
@@ -440,14 +400,17 @@ public final class SkillsPanelClient {
         final InventoryScreen inv;
         SkillsToggleButton btn;
         PanelBackground bg;
-        SkillListWidget list;
-        SkillDetailsPanel details;
-
+        SkillListWidget skillsList;
+        SkillDetailsPanel skillsDetails;
+        AbilityListWidget abilityList;
+        AbilityDetailsPanel abilityDetails;
+        PanelTabButton skillsTab;
+        PanelTabButton abilitiesTab;
         ImageButton recipeBtn;
         boolean recipeHiddenBySkills;
-
         boolean open;
         Integer originalLeft;
+        PanelTab activeTab = PanelTab.SKILLS;
 
         State(InventoryScreen inv) {
             this.inv = inv;

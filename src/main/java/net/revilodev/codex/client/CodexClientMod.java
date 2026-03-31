@@ -4,6 +4,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.revilodev.codex.client.abilities.AbilityHudOverlay;
+import net.revilodev.codex.client.abilities.AbilityKeybinds;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.client.skills.SkillsPanelClient;
 import net.revilodev.codex.client.toast.LevelUpToast;
@@ -12,6 +14,8 @@ import net.revilodev.codex.client.toast.LevelUpToast;
 public final class CodexClientMod {
     public CodexClientMod(IEventBus modBus) {
         SkillsPanelClient.register();
+        AbilityKeybinds.register(modBus);
         NeoForge.EVENT_BUS.addListener(LevelUpToast::render);
+        NeoForge.EVENT_BUS.addListener(AbilityHudOverlay::render);
     }
 }

@@ -4,6 +4,10 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.revilodev.codex.abilities.AbilitiesAttachments;
+import net.revilodev.codex.abilities.AbilitiesEvents;
+import net.revilodev.codex.abilities.AbilitiesNetwork;
+import net.revilodev.codex.abilities.AbilityConfig;
 import net.revilodev.codex.item.ModItems;
 import net.revilodev.codex.skills.SkillsAttachments;
 import net.revilodev.codex.skills.SkillConfig;
@@ -17,11 +21,16 @@ public final class CodexMod {
     public CodexMod(IEventBus modBus, ModContainer container) {
         ModItems.register(modBus);                 // <-- REQUIRED
         container.registerConfig(ModConfig.Type.SERVER, SkillConfig.SPEC);
+        container.registerConfig(ModConfig.Type.SERVER, AbilityConfig.SPEC, MOD_ID + "-abilities-server.toml");
 
         SkillsAttachments.REGISTER.register(modBus);
+        AbilitiesAttachments.REGISTER.register(modBus);
         modBus.addListener(SkillsNetwork::onRegisterPayloadHandlers);
+        modBus.addListener(AbilitiesNetwork::onRegisterPayloadHandlers);
         net.revilodev.codex.skills.command.SkillsCommands.register();
+        net.revilodev.codex.abilities.command.AbilitiesCommands.register();
 
         SkillsEvents.register();
+        AbilitiesEvents.register();
     }
 }

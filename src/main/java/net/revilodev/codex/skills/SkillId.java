@@ -20,7 +20,7 @@ public enum SkillId {
     VITALITY(SkillCategory.VITALITY, true, null, "Vitality", "+1 heart per level", "vitaility", 10),
     REGENERATION(SkillCategory.VITALITY, false, VITALITY, "Regeneration", "+1 regen (5%)", "vitaility-regen", 5),
     HEALTH_BOOST(SkillCategory.VITALITY, false, VITALITY, "Life Leach", "+1% life leach", "vitaility-health_boost", 5),
-    CLEANSE(SkillCategory.VITALITY, false, VITALITY, "Cleanse", "Shortens and weakens negative effects by 5% per level", "vitaility-cleanse", 5),
+    CLEANSE(SkillCategory.VITALITY, false, VITALITY, "Immunity", "Shortens and weakens negative effects by 5% per level", "vitaility-cleanse", 5),
 
     LUCK(SkillCategory.LUCK, true, null, "Luck", "+1 luck per level", "luck", 10),
     LOOTING(SkillCategory.LUCK, false, LUCK, "Looting", "+2% chance per level", "luck-looting", 2),
