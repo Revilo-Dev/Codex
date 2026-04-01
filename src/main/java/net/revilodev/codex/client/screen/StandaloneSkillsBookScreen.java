@@ -71,8 +71,8 @@ public final class StandaloneSkillsBookScreen extends Screen {
         });
         abilityDetails = new AbilityDetailsPanel(detailsX, detailsY, detailsW, detailsH);
 
-        skillsTab = new PanelTabButton(panelX - 32, panelY + 6, PanelTab.SKILLS, () -> setTab(PanelTab.SKILLS));
-        abilitiesTab = new PanelTabButton(panelX - 32, panelY + 34, PanelTab.ABILITIES, () -> setTab(PanelTab.ABILITIES));
+        skillsTab = new PanelTabButton(panelX - 31, panelY + 6, PanelTab.SKILLS, () -> setTab(PanelTab.SKILLS));
+        abilitiesTab = new PanelTabButton(panelX - 31, panelY + 34, PanelTab.ABILITIES, () -> setTab(PanelTab.ABILITIES));
 
         addRenderableWidget(skillsList);
         addRenderableWidget(skillsDetails);
@@ -82,7 +82,6 @@ public final class StandaloneSkillsBookScreen extends Screen {
         addRenderableWidget(abilityDetails);
         addRenderableWidget(abilityDetails.upgradeButton());
         addRenderableWidget(abilityDetails.downgradeButton());
-        addRenderableWidget(abilityDetails.bindButton());
         addRenderableWidget(skillsTab);
         addRenderableWidget(abilitiesTab);
 
@@ -168,7 +167,5 @@ public final class StandaloneSkillsBookScreen extends Screen {
         abilityDetails.upgradeButton().active = !skillsActive;
         abilityDetails.downgradeButton().visible = !skillsActive;
         abilityDetails.downgradeButton().active = !skillsActive;
-        abilityDetails.bindButton().visible = !skillsActive;
-        abilityDetails.bindButton().active = !skillsActive;
     }
 }

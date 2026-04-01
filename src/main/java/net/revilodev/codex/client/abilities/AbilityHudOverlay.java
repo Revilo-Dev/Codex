@@ -3,7 +3,6 @@ package net.revilodev.codex.client.abilities;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
@@ -31,13 +30,13 @@ public final class AbilityHudOverlay {
 
         int x = 8;
         int y = gg.guiHeight() - 28;
-        for (int slot = 1; slot <= AbilityConfig.maxSlots(); slot++) {
-            drawSlot(gg, mc.font, x + (slot - 1) * 22, y, slot, abilities, skills);
+        var recent = abilities.recentAbilities();
+        for (int i = 0; i < recent.size(); i++) {
+            drawAbility(gg, mc.font, x + i * 22, y, recent.get(i), abilities, skills);
         }
     }
 
-    private static void drawSlot(GuiGraphics gg, Font font, int x, int y, int slot, PlayerAbilities abilities, PlayerSkills skills) {
-        AbilityId id = abilities.slot(slot);
+    private static void drawAbility(GuiGraphics gg, Font font, int x, int y, AbilityId id, PlayerAbilities abilities, PlayerSkills skills) {
         gg.fill(x, y, x + 20, y + 20, 0xB0101010);
         gg.fill(x - 1, y - 1, x + 21, y, 0x80383838);
         gg.fill(x - 1, y + 20, x + 21, y + 21, 0x80383838);
@@ -47,7 +46,7 @@ public final class AbilityHudOverlay {
         if (id == null) return;
 
         AbilityDefinition def = AbilityRegistry.def(id);
-        if (def != null) gg.renderItem(new ItemStack(def.iconItem()), x + 2, y + 2);
+        if (def != null) gg.blit(def.iconTexture(), x + 2, y + 2, 0, 0, 16, 16, 16, 16);
 
         int remaining = abilities.cooldownTicks(id);
         if (remaining > 0) {

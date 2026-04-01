@@ -4,16 +4,18 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.neoforged.neoforge.common.util.INBTSerializable;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 
 public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
-    private static final int SLOT_COUNT = 5;
+    private static final int RECENT_COUNT = 3;
 
     private int points;
     private final EnumMap<AbilityId, Integer> ranks = new EnumMap<>(AbilityId.class);
     private final EnumMap<AbilityId, Integer> cooldowns = new EnumMap<>(AbilityId.class);
     private final EnumMap<AbilityId, Integer> activeTicks = new EnumMap<>(AbilityId.class);
-    private final AbilityId[] slots = new AbilityId[SLOT_COUNT];
+    private final List<AbilityId> recent = new ArrayList<>();
 
     public PlayerAbilities() {
         reset();
@@ -29,10 +31,6 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
 
     public boolean unlocked(AbilityId id) {
         return rank(id) > 0;
-    }
-
-    public AbilityId slot(int slot) {
-        return validSlot(slot) ? slots[slot - 1] : null;
     }
 
     public int cooldownTicks(AbilityId id) {
@@ -60,8 +58,9 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         ranks.put(id, next);
         points++;
         if (next <= 0) {
-            clearAssignment(id);
             cooldowns.remove(id);
+            activeTicks.remove(id);
+            recent.remove(id);
         }
         return true;
     }
@@ -79,32 +78,10 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         int next = Math.max(0, Math.min(id.maxRank(), rank));
         ranks.put(id, next);
         if (next <= 0) {
-            clearAssignment(id);
             cooldowns.remove(id);
+            activeTicks.remove(id);
+            recent.remove(id);
         }
-    }
-
-    public boolean assign(int slot, AbilityId id) {
-        if (!validSlot(slot) || slot > AbilityConfig.maxSlots()) return false;
-        if (id != null && !unlocked(id)) return false;
-        if (id != null) clearAssignment(id);
-        slots[slot - 1] = id;
-        return true;
-    }
-
-    public boolean clearAssignmentFor(AbilityId id) {
-        if (id == null) return false;
-        boolean changed = assignedSlot(id) != 0;
-        clearAssignment(id);
-        return changed;
-    }
-
-    public int assignedSlot(AbilityId id) {
-        if (id == null) return 0;
-        for (int i = 0; i < slots.length; i++) {
-            if (slots[i] == id) return i + 1;
-        }
-        return 0;
     }
 
     public void setCooldown(AbilityId id, int ticks) {
@@ -134,14 +111,21 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         return changed;
     }
 
-    public void adminReset() {
-        reset();
+    public void markUsed(AbilityId id) {
+        if (id == null || !unlocked(id)) return;
+        recent.remove(id);
+        recent.add(0, id);
+        while (recent.size() > RECENT_COUNT) {
+            recent.remove(recent.size() - 1);
+        }
     }
 
-    private void clearAssignment(AbilityId id) {
-        for (int i = 0; i < slots.length; i++) {
-            if (slots[i] == id) slots[i] = null;
-        }
+    public List<AbilityId> recentAbilities() {
+        return List.copyOf(recent);
+    }
+
+    public void adminReset() {
+        reset();
     }
 
     private void reset() {
@@ -149,7 +133,7 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         ranks.clear();
         cooldowns.clear();
         activeTicks.clear();
-        for (int i = 0; i < slots.length; i++) slots[i] = null;
+        recent.clear();
         for (AbilityId id : AbilityId.values()) {
             ranks.put(id, 0);
         }
@@ -174,9 +158,11 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         tag.put("ranks", ranksTag);
         tag.put("cooldowns", cooldownTag);
         tag.put("active", activeTag);
-        for (int i = 0; i < slots.length; i++) {
-            if (slots[i] != null) tag.putString("slot" + (i + 1), slots[i].name());
+        CompoundTag recentTag = new CompoundTag();
+        for (int i = 0; i < recent.size(); i++) {
+            recentTag.putString("recent" + i, recent.get(i).name());
         }
+        tag.put("recent", recentTag);
         return tag;
     }
 
@@ -189,6 +175,7 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         CompoundTag ranksTag = nbt.getCompound("ranks");
         CompoundTag cooldownTag = nbt.getCompound("cooldowns");
         CompoundTag activeTag = nbt.getCompound("active");
+        CompoundTag recentTag = nbt.getCompound("recent");
         for (AbilityId id : AbilityId.values()) {
             if (ranksTag.contains(id.name())) {
                 ranks.put(id, Math.max(0, Math.min(id.maxRank(), ranksTag.getInt(id.name()))));
@@ -200,15 +187,12 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
                 activeTicks.put(id, Math.max(0, activeTag.getInt(id.name())));
             }
         }
-
-        for (int i = 0; i < slots.length; i++) {
-            AbilityId id = parseAbility(nbt.getString("slot" + (i + 1)));
-            slots[i] = id != null && unlocked(id) ? id : null;
+        for (int i = 0; i < RECENT_COUNT; i++) {
+            AbilityId id = parseAbility(recentTag.getString("recent" + i));
+            if (id != null && unlocked(id) && !recent.contains(id)) {
+                recent.add(id);
+            }
         }
-    }
-
-    private static boolean validSlot(int slot) {
-        return slot >= 1 && slot <= SLOT_COUNT;
     }
 
     private static AbilityId parseAbility(String name) {

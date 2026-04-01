@@ -70,8 +70,6 @@ public final class AbilitiesNetwork {
             boolean changed = switch (payload.action()) {
                 case 0 -> abilities.tryUpgrade(id);
                 case 1 -> abilities.tryDowngrade(id);
-                case 2 -> abilities.assign(payload.slot(), id);
-                case 3 -> abilities.clearAssignmentFor(id);
                 default -> false;
             };
             if (!changed) return;
@@ -82,7 +80,8 @@ public final class AbilitiesNetwork {
     private static void handleUse(AbilityUsePayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) return;
-            if (AbilityLogic.tryActivate(player, payload.slot())) {
+            AbilityId id = AbilityId.byOrdinal(payload.abilityOrdinal());
+            if (AbilityLogic.tryActivate(player, id)) {
                 AbilitySyncEvents.markDirty(player);
             }
         });
@@ -107,7 +106,7 @@ public final class AbilitiesNetwork {
         }
     }
 
-    public record AbilityActionPayload(int action, int abilityOrdinal, int slot) implements CustomPacketPayload {
+    public record AbilityActionPayload(int action, int abilityOrdinal) implements CustomPacketPayload {
         public static final Type<AbilityActionPayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "ability_action"));
 
@@ -116,9 +115,8 @@ public final class AbilitiesNetwork {
                         (buf, msg) -> {
                             buf.writeVarInt(msg.action);
                             buf.writeVarInt(msg.abilityOrdinal);
-                            buf.writeVarInt(msg.slot);
                         },
-                        buf -> new AbilityActionPayload(buf.readVarInt(), buf.readVarInt(), buf.readVarInt())
+                        buf -> new AbilityActionPayload(buf.readVarInt(), buf.readVarInt())
                 );
 
         @Override
@@ -127,12 +125,12 @@ public final class AbilitiesNetwork {
         }
     }
 
-    public record AbilityUsePayload(int slot) implements CustomPacketPayload {
+    public record AbilityUsePayload(int abilityOrdinal) implements CustomPacketPayload {
         public static final Type<AbilityUsePayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "ability_use"));
 
         public static final StreamCodec<RegistryFriendlyByteBuf, AbilityUsePayload> STREAM_CODEC =
-                StreamCodec.of((buf, msg) -> buf.writeVarInt(msg.slot), buf -> new AbilityUsePayload(buf.readVarInt()));
+                StreamCodec.of((buf, msg) -> buf.writeVarInt(msg.abilityOrdinal), buf -> new AbilityUsePayload(buf.readVarInt()));
 
         @Override
         public Type<? extends CustomPacketPayload> type() {

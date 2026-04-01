@@ -43,6 +43,11 @@ public enum AbilityId {
         return iconItem;
     }
 
+    public ResourceLocation iconTexture() {
+        String name = this == EXECUTION ? "execute" : name().toLowerCase(java.util.Locale.ROOT);
+        return ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/abilities/" + name + ".png");
+    }
+
     public SkillId scalingSkill() {
         return scalingSkill;
     }

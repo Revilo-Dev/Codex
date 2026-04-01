@@ -6,7 +6,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.CodexMod;
@@ -28,6 +27,10 @@ public final class AbilityListWidget extends AbstractWidget {
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-hovered.png");
     private static final ResourceLocation WIDGET_DISABLED_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-disabled.png");
+    private static final ResourceLocation WIDGET_PRIMARY_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-primary.png");
+    private static final ResourceLocation WIDGET_PRIMARY_HOVER_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget_primary-hovered.png");
 
     private static final int HEADER_HEIGHT = 11;
     private static final int CELL_SIZE = 23;
@@ -37,6 +40,7 @@ public final class AbilityListWidget extends AbstractWidget {
     private final Consumer<AbilityDefinition> onClick;
     private final List<Node> nodes = new ArrayList<>();
     private AbilityId selected;
+    private boolean headerVisible = true;
 
     public AbilityListWidget(int x, int y, int w, int h, Consumer<AbilityDefinition> onClick) {
         super(x, y, w, h, Component.empty());
@@ -63,6 +67,10 @@ public final class AbilityListWidget extends AbstractWidget {
         this.selected = selected;
     }
 
+    public void setHeaderVisible(boolean headerVisible) {
+        this.headerVisible = headerVisible;
+    }
+
     public boolean isOnAbilityNode(double mx, double my) {
         return nodeAt(mx, my) != null;
     }
@@ -83,7 +91,9 @@ public final class AbilityListWidget extends AbstractWidget {
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible || mc.player == null) return;
         PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-        drawScaledText(gg, "Ability Points: " + abilities.points(), getX() + 1, getY() + 4, 0xC78CFF, 0.85F);
+        if (headerVisible) {
+            drawScaledText(gg, "Ability Points: " + abilities.points(), getX() + 1, getY() + 4, 0xC78CFF, 0.85F);
+        }
 
         int top = getY() + HEADER_HEIGHT;
         for (Node node : nodes) {
@@ -91,12 +101,18 @@ public final class AbilityListWidget extends AbstractWidget {
             int y = top + node.row * (CELL_SIZE + GAP);
             AbilityDefinition def = node.def;
             boolean hovered = mouseX >= x && mouseX <= x + CELL_SIZE && mouseY >= y && mouseY <= y + CELL_SIZE;
-            boolean unlocked = abilities.rank(def.id()) > 0;
+            int rank = abilities.rank(def.id());
+            boolean unlocked = rank > 0;
+            boolean maxed = rank >= def.maxRank();
 
             ResourceLocation tex = unlocked || selected == def.id() || hovered ? WIDGET_HOVER_TEX : WIDGET_DISABLED_TEX;
-            if (unlocked && !hovered && selected != def.id()) tex = WIDGET_TEX;
+            if (maxed) {
+                tex = (selected == def.id() || hovered) ? WIDGET_PRIMARY_HOVER_TEX : WIDGET_PRIMARY_TEX;
+            } else if (unlocked && !hovered && selected != def.id()) {
+                tex = WIDGET_TEX;
+            }
             drawScaledTile(gg, tex, x, y, CELL_SIZE, CELL_SIZE);
-            gg.renderItem(new ItemStack(def.iconItem()), x + 3, y + 3);
+            gg.blit(def.iconTexture(), x + 3, y + 3, 0, 0, 16, 16, 16, 16);
         }
     }
 

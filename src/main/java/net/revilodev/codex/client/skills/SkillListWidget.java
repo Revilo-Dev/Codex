@@ -51,6 +51,7 @@ public final class SkillListWidget extends AbstractWidget {
     private final Consumer<SkillDefinition> onClick;
     private final List<Node> nodes = new ArrayList<>();
     private SkillId selected;
+    private boolean headerVisible = true;
 
     public SkillListWidget(int x, int y, int w, int h, Consumer<SkillDefinition> onClick) {
         super(x, y, w, h, Component.empty());
@@ -81,6 +82,10 @@ public final class SkillListWidget extends AbstractWidget {
         this.selected = selected;
     }
 
+    public void setHeaderVisible(boolean headerVisible) {
+        this.headerVisible = headerVisible;
+    }
+
     public boolean isOnSkillNode(double mx, double my) {
         return nodeAt(mx, my) != null;
     }
@@ -101,7 +106,9 @@ public final class SkillListWidget extends AbstractWidget {
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float pt) {
         if (!visible || mc.player == null) return;
         PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        drawScaledText(gg, "Points: " + ps.points(), getX() + 1, getY() + 4, 0x6AB2FF, POINTS_TEXT_SCALE);
+        if (headerVisible) {
+            drawScaledText(gg, "Points: " + ps.points(), getX() + 1, getY() + 4, 0x6AB2FF, POINTS_TEXT_SCALE);
+        }
 
         int top = getY() + HEADER_HEIGHT;
         RenderSystem.enableBlend();

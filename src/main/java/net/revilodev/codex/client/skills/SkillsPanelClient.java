@@ -9,17 +9,23 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.client.event.ScreenEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.CodexMod;
+import net.revilodev.codex.abilities.AbilitiesAttachments;
+import net.revilodev.codex.abilities.PlayerAbilities;
 import net.revilodev.codex.client.PanelTab;
 import net.revilodev.codex.client.PanelTabButton;
 import net.revilodev.codex.client.SkillsToggleButton;
 import net.revilodev.codex.client.abilities.AbilityDetailsPanel;
 import net.revilodev.codex.client.abilities.AbilityListWidget;
+import net.revilodev.codex.skills.SkillsAttachments;
 
 import java.lang.reflect.Field;
 import java.util.Map;
@@ -54,6 +60,7 @@ public final class SkillsPanelClient {
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Init.Post.class, SkillsPanelClient::onScreenInit);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Closing.class, SkillsPanelClient::onScreenClosing);
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, false, ScreenEvent.Render.Pre.class, SkillsPanelClient::onScreenRenderPre);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, SkillsPanelClient::onScreenRenderPost);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonPressed.Pre.class, SkillsPanelClient::onMousePressed);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseDragged.Pre.class, SkillsPanelClient::onMouseDragged);
@@ -73,26 +80,25 @@ public final class SkillsPanelClient {
             st.skillsDetails.setSkill(def);
             st.skillsList.setSelected(def == null ? null : def.id());
         });
+        st.skillsList.setHeaderVisible(false);
         st.skillsList.reloadSkills();
         st.skillsDetails = new SkillDetailsPanel(0, 0, SkillListWidget.gridWidth(), PANEL_H / 3);
         st.abilityList = new AbilityListWidget(0, 0, AbilityListWidget.gridWidth(), AbilityListWidget.preferredHeight(), def -> {
             st.abilityDetails.setAbility(def);
             st.abilityList.setSelected(def == null ? null : def.id());
         });
+        st.abilityList.setHeaderVisible(false);
         st.abilityDetails = new AbilityDetailsPanel(0, 0, AbilityListWidget.gridWidth(), PANEL_H / 3);
         st.skillsTab = new PanelTabButton(0, 0, PanelTab.SKILLS, () -> setTab(st, PanelTab.SKILLS));
         st.abilitiesTab = new PanelTabButton(0, 0, PanelTab.ABILITIES, () -> setTab(st, PanelTab.ABILITIES));
 
         event.addListener(st.bg);
         event.addListener(st.skillsList);
-        event.addListener(st.skillsDetails);
         event.addListener(st.skillsDetails.upgradeButton());
         event.addListener(st.skillsDetails.downgradeButton());
         event.addListener(st.abilityList);
-        event.addListener(st.abilityDetails);
         event.addListener(st.abilityDetails.upgradeButton());
         event.addListener(st.abilityDetails.downgradeButton());
-        event.addListener(st.abilityDetails.bindButton());
         event.addListener(st.skillsTab);
         event.addListener(st.abilitiesTab);
         event.addListener(st.btn);
@@ -132,6 +138,18 @@ public final class SkillsPanelClient {
         if (st.recipeBtn == null) st.recipeBtn = findRecipeButton(inv);
         if (st.open) forceHideRecipeButtonIfSkillsOpen(st);
         else restoreRecipeButtonIfWeHidIt(inv, st);
+    }
+
+    public static void onScreenRenderPost(ScreenEvent.Render.Post event) {
+        Screen screen = event.getScreen();
+        State st = STATES.get(screen);
+        if (st == null || !st.open || !(screen instanceof InventoryScreen inv)) return;
+        if (st.activeTab == PanelTab.SKILLS && st.skillsDetails.visible) {
+            st.skillsDetails.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.visible) {
+            st.abilityDetails.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        }
+        renderPointsBadge(event.getGuiGraphics(), st, inv);
     }
 
     public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre event) {
@@ -296,8 +314,8 @@ public final class SkillsPanelClient {
         st.skillsDetails.setBounds(detailsX, detailsY, detailsW, detailsH);
         st.abilityList.setBounds(listX, listY, listW, AbilityListWidget.preferredHeight());
         st.abilityDetails.setBounds(detailsX, detailsY, detailsW, detailsH);
-        st.skillsTab.setPosition(bgx - 32, bgy + 6);
-        st.abilitiesTab.setPosition(bgx - 32, bgy + 34);
+        st.skillsTab.setPosition(bgx - 31, bgy + 6);
+        st.abilitiesTab.setPosition(bgx - 31, bgy + 34);
     }
 
     private static Integer getLeft(InventoryScreen inv) {
@@ -360,8 +378,31 @@ public final class SkillsPanelClient {
         st.abilityDetails.upgradeButton().active = abilitiesActive;
         st.abilityDetails.downgradeButton().visible = abilitiesActive;
         st.abilityDetails.downgradeButton().active = abilitiesActive;
-        st.abilityDetails.bindButton().visible = abilitiesActive;
-        st.abilityDetails.bindButton().active = abilitiesActive;
+    }
+
+    private static void renderPointsBadge(GuiGraphics gg, State st, InventoryScreen inv) {
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc.player == null) return;
+
+        int points = st.activeTab == PanelTab.ABILITIES
+                ? mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get()).points()
+                : mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get()).points();
+
+        String text = Integer.toString(points);
+        int x = inv.getGuiLeft() + 32;
+        int y = inv.getGuiTop() + 25;
+        int textColor = 0xD88CFF;
+        float pulse = 0.55F + 0.45F * (float) Math.sin((System.currentTimeMillis() % 1600L) / 1600.0D * Math.PI * 2.0D);
+        int glowOuter = ((int) (50 + 45 * pulse) << 24) | 0xA86CFF;
+        int glowInner = ((int) (85 + 65 * pulse) << 24) | 0xE0BEFF;
+
+        gg.fill(x - 4, y - 4, x + 12, y + 12, glowOuter);
+        gg.fill(x - 2, y - 2, x + 10, y + 10, glowInner);
+        gg.fill(x - 1, y - 1, x + 9, y + 9, 0xB02B173D);
+        gg.renderItem(new ItemStack(Items.GOLD_NUGGET), x, y);
+
+        gg.drawString(mc.font, text, x + 14, y + 1, textColor, false);
+        gg.drawString(mc.font, text, x + 13, y, 0x66F2D9FF, false);
     }
 
     private static final class PanelBackground extends AbstractWidget {

@@ -11,32 +11,32 @@ import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.abilities.AbilitiesAttachments;
 import net.revilodev.codex.abilities.AbilitiesNetwork;
+import net.revilodev.codex.abilities.AbilityId;
 import net.revilodev.codex.abilities.PlayerAbilities;
+
+import java.util.EnumMap;
+import java.util.Map;
 
 @OnlyIn(Dist.CLIENT)
 public final class AbilityKeybinds {
     private static final String CATEGORY = "key.categories.codex";
-    private static final KeyMapping[] SLOTS = new KeyMapping[] {
-            new KeyMapping("key.codex.ability_slot_1", InputConstants.KEY_Z, CATEGORY),
-            new KeyMapping("key.codex.ability_slot_2", InputConstants.KEY_X, CATEGORY),
-            new KeyMapping("key.codex.ability_slot_3", InputConstants.KEY_C, CATEGORY),
-            new KeyMapping("key.codex.ability_slot_4", InputConstants.KEY_V, CATEGORY),
-            new KeyMapping("key.codex.ability_slot_5", InputConstants.KEY_B, CATEGORY)
-    };
+    private static final Map<AbilityId, KeyMapping> KEYS = new EnumMap<>(AbilityId.class);
 
     private AbilityKeybinds() {}
 
     public static void register(IEventBus modBus) {
+        if (KEYS.isEmpty()) createMappings();
         modBus.addListener(AbilityKeybinds::onRegisterKeyMappings);
         NeoForge.EVENT_BUS.addListener(AbilityKeybinds::onClientTick);
     }
 
-    public static String slotKeyName(int slot) {
-        return key(slot).getTranslatedKeyMessage().getString();
+    public static String keyName(AbilityId id) {
+        KeyMapping key = KEYS.get(id);
+        return key != null ? key.getTranslatedKeyMessage().getString() : "Unbound";
     }
 
     private static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
-        for (KeyMapping key : SLOTS) event.register(key);
+        for (KeyMapping key : KEYS.values()) event.register(key);
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
@@ -46,24 +46,35 @@ public final class AbilityKeybinds {
         PlayerAbilities data = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
         data.tickCooldowns();
 
-        for (int i = 0; i < SLOTS.length; i++) {
-            int slot = i + 1;
-            while (SLOTS[i].consumeClick()) {
-                useSlot(slot);
+        for (var entry : KEYS.entrySet()) {
+            while (entry.getValue().consumeClick()) {
+                useAbility(entry.getKey());
             }
         }
     }
 
-    private static KeyMapping key(int slot) {
-        if (slot < 1 || slot > SLOTS.length) return SLOTS[0];
-        return SLOTS[slot - 1];
+    private static void createMappings() {
+        add(AbilityId.DASH, "dash", InputConstants.KEY_Z);
+        add(AbilityId.LEAP, "leap", InputConstants.KEY_X);
+        add(AbilityId.HEAL, "heal", InputConstants.KEY_C);
+        add(AbilityId.CLEANSE, "cleanse", InputConstants.KEY_V);
+        add(AbilityId.GUARD, "guard", InputConstants.KEY_B);
+        add(AbilityId.WARCRY, "warcry", InputConstants.KEY_N);
+        add(AbilityId.EXECUTION, "execution", InputConstants.KEY_M);
+        add(AbilityId.CLEAVE, "cleave", InputConstants.KEY_J);
+        add(AbilityId.OVERPOWER, "overpower", InputConstants.KEY_K);
+        add(AbilityId.SCAVENGER, "magnetism", InputConstants.KEY_L);
     }
 
-    private static void useSlot(int slot) {
+    private static void add(AbilityId id, String keyName, int defaultKey) {
+        KEYS.put(id, new KeyMapping("key.codex.ability." + keyName, defaultKey, CATEGORY));
+    }
+
+    private static void useAbility(AbilityId id) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null) return;
         PlayerAbilities data = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-        if (data.slot(slot) == null) return;
-        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new AbilitiesNetwork.AbilityUsePayload(slot));
+        if (!data.unlocked(id)) return;
+        net.neoforged.neoforge.network.PacketDistributor.sendToServer(new AbilitiesNetwork.AbilityUsePayload(id.ordinal()));
     }
 }

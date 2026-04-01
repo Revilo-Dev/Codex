@@ -103,13 +103,6 @@ public final class SkillDetailsPanel extends AbstractWidget {
             downgrade.visible = false;
             return;
         }
-        PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        int level = ps.level(skill.id());
-        boolean unlocked = ps.canUnlock(skill.id());
-        boolean canUp = unlocked
-                && level < skill.maxLevel()
-                && ps.points() > 0;
-        boolean canDown = ps.canDowngrade(skill.id());
 
         int x = getX();
         int y = getY();
@@ -118,6 +111,13 @@ public final class SkillDetailsPanel extends AbstractWidget {
 
         gg.fill(x, y, x + w, y + h, 0xEE303234);
         gg.hLine(x, x + w, y, 0xAA5A5A5A);
+        PlayerSkills ps = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
+        int level = ps.level(skill.id());
+        boolean unlocked = ps.canUnlock(skill.id());
+        boolean canUp = unlocked
+                && level < skill.maxLevel()
+                && ps.points() > 0;
+        boolean canDown = ps.canDowngrade(skill.id());
         gg.blit(skill.icon(), x + 4, y + 4, 0, 0, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE);
         drawScaledText(gg, skill.title(), x + 18, y + 5, 0xFFFFFF, HEADER_TEXT_SCALE);
         drawScaledText(gg, "level: " + level + "/" + skill.maxLevel(), x + 18, y + 11, 0xD0D0D0, HEADER_TEXT_SCALE);
@@ -142,8 +142,6 @@ public final class SkillDetailsPanel extends AbstractWidget {
         downgrade.active = canDown;
         upgrade.visible = true;
         downgrade.visible = true;
-        upgrade.render(gg, mouseX, mouseY, partialTick);
-        downgrade.render(gg, mouseX, mouseY, partialTick);
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double delta) {

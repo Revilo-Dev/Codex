@@ -78,27 +78,13 @@ public final class AbilitiesCommands {
                             return success(ctx.getSource(), "Unlocked " + id.name() + ".");
                         })));
 
-        root.then(Commands.literal("setslot")
-                .then(Commands.argument("slot", IntegerArgumentType.integer(1, 5))
-                        .then(Commands.argument("ability", StringArgumentType.word()).suggests(SUGGEST_ABILITIES)
-                                .executes(ctx -> {
-                                    ServerPlayer player = ctx.getSource().getPlayerOrException();
-                                    int slot = IntegerArgumentType.getInteger(ctx, "slot");
-                                    AbilityId id = parseAbility(StringArgumentType.getString(ctx, "ability"));
-                                    if (id == null) return failure(ctx.getSource(), "Unknown ability.");
-                                    PlayerAbilities data = player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-                                    if (!data.assign(slot, id)) return failure(ctx.getSource(), "Could not assign slot.");
-                                    AbilitiesNetwork.syncTo(player);
-                                    return success(ctx.getSource(), "Assigned " + id.name() + " to slot " + slot + ".");
-                                }))));
-
         root.then(Commands.literal("reset")
                 .executes(ctx -> {
                     ServerPlayer player = ctx.getSource().getPlayerOrException();
                     PlayerAbilities data = player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
                     data.adminReset();
                     AbilitiesNetwork.syncTo(player);
-                    return success(ctx.getSource(), "Reset abilities, slots, cooldowns, and points.");
+                    return success(ctx.getSource(), "Reset abilities, cooldowns, recent HUD history, and points.");
                 }));
 
         dispatcher.register(root);

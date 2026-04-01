@@ -26,12 +26,11 @@ import java.util.List;
 public final class AbilityLogic {
     private AbilityLogic() {}
 
-    public static boolean tryActivate(ServerPlayer player, int slot) {
-        if (player == null || slot < 1 || slot > 2 || slot > AbilityConfig.maxSlots()) return false;
+    public static boolean tryActivate(ServerPlayer player, AbilityId id) {
+        if (player == null || id == null) return false;
 
         PlayerAbilities abilities = player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-        AbilityId id = abilities.slot(slot);
-        if (id == null || !AbilityConfig.enabled(id)) return false;
+        if (!AbilityConfig.enabled(id)) return false;
 
         int rank = abilities.rank(id);
         if (rank <= 0 || abilities.cooldownTicks(id) > 0) return false;
@@ -41,6 +40,7 @@ public final class AbilityLogic {
         if (!executed) return false;
 
         abilities.setCooldown(id, AbilityScaling.cooldownTicks(id, rank, skills));
+        abilities.markUsed(id);
         return true;
     }
 
@@ -161,17 +161,20 @@ public final class AbilityLogic {
 
     public static void tickActive(ServerPlayer player, PlayerAbilities abilities, PlayerSkills skills) {
         int active = abilities.activeTicks(AbilityId.SCAVENGER);
-        if (active > 0) {
-            double radius = AbilityScaling.magnetismRadius(Math.max(1, abilities.rank(AbilityId.SCAVENGER)), skills);
-            List<ItemEntity> items = player.level().getEntitiesOfClass(ItemEntity.class, player.getBoundingBox().inflate(radius), Entity::isAlive);
-            for (ItemEntity item : items) {
-                Vec3 toward = player.position().add(0.0D, 0.35D, 0.0D).subtract(item.position());
-                if (toward.lengthSqr() > 1.0E-4D) {
-                    item.setDeltaMovement(toward.normalize().scale(0.45D));
-                    item.hasImpulse = true;
-                }
+        if (active <= 0) return;
+
+        int next = active - 1;
+        abilities.setActiveTicks(AbilityId.SCAVENGER, next);
+        if (next <= 0) return;
+
+        double radius = AbilityScaling.magnetismRadius(Math.max(1, abilities.rank(AbilityId.SCAVENGER)), skills);
+        List<ItemEntity> items = player.level().getEntitiesOfClass(ItemEntity.class, player.getBoundingBox().inflate(radius), Entity::isAlive);
+        for (ItemEntity item : items) {
+            Vec3 toward = player.position().add(0.0D, 0.35D, 0.0D).subtract(item.position());
+            if (toward.lengthSqr() > 1.0E-4D) {
+                item.setDeltaMovement(toward.normalize().scale(0.45D));
+                item.hasImpulse = true;
             }
-            abilities.setActiveTicks(AbilityId.SCAVENGER, active - 1);
         }
     }
 
