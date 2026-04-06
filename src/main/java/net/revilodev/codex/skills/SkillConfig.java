@@ -2,6 +2,8 @@ package net.revilodev.codex.skills;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
 
+import java.util.EnumMap;
+
 public final class SkillConfig {
     private SkillConfig() {}
 
@@ -24,11 +26,23 @@ public final class SkillConfig {
     private static final ModConfigSpec.DoubleValue LUCK_PER_LEVEL;
     private static final ModConfigSpec.DoubleValue LOOTING_CHANCE_PER_LEVEL;
     private static final ModConfigSpec.IntValue FORTUNE_BONUS_PER_LEVEL;
+    private static final ModConfigSpec.BooleanValue SPAWN_WITH_SKILLS_BOOK;
+    private static final EnumMap<SkillId, ModConfigSpec.IntValue> MAX_LEVELS = new EnumMap<>(SkillId.class);
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.push("progression");
         POINTS_PER_LEVEL = builder.defineInRange("pointsPerLevel", 1, 0, 10);
+        builder.pop();
+
+        builder.push("items");
+        SPAWN_WITH_SKILLS_BOOK = builder.define("spawnWithSkillsBook", true);
+        builder.pop();
+
+        builder.push("maxLevels");
+        for (SkillId id : SkillId.values()) {
+            MAX_LEVELS.put(id, builder.defineInRange(id.name().toLowerCase(java.util.Locale.ROOT), id.defaultMaxLevel(), 1, 100));
+        }
         builder.pop();
 
         builder.push("scaling");
@@ -41,7 +55,7 @@ public final class SkillConfig {
         PROJECTILE_RESIST_PER_LEVEL = builder.defineInRange("projectileResistancePerLevel", 0.05D, 0.0D, 1.0D);
         KNOCKBACK_RESIST_PER_LEVEL = builder.defineInRange("knockbackResistancePerLevel", 0.05D, 0.0D, 1.0D);
         AGILITY_SPEED_PER_LEVEL = builder.defineInRange("agilitySpeedPerLevel", 0.10D, 0.0D, 2.0D);
-        LEAPING_PER_LEVEL = builder.defineInRange("leapingBonusPerLevel", 0.10D, 0.0D, 2.0D);
+        LEAPING_PER_LEVEL = builder.defineInRange("leapingBonusPerLevel", 0.20D, 0.0D, 2.0D);
         REGEN_HEARTS_PER_LEVEL = builder.defineInRange("regenHeartsPerSecondPerLevel", 0.05D, 0.0D, 2.0D);
         VITALITY_HEARTS_PER_LEVEL = builder.defineInRange("vitalityHeartsPerLevel", 1.0D, 0.0D, 10.0D);
         LIFE_LEACH_PER_LEVEL = builder.defineInRange("lifeLeachPerLevel", 0.01D, 0.0D, 1.0D);
@@ -72,4 +86,9 @@ public final class SkillConfig {
     public static double luckPerLevel() { return LUCK_PER_LEVEL.get(); }
     public static double lootingChancePerLevel() { return LOOTING_CHANCE_PER_LEVEL.get(); }
     public static int fortuneBonusPerLevel() { return FORTUNE_BONUS_PER_LEVEL.get(); }
+    public static boolean spawnWithSkillsBook() { return SPAWN_WITH_SKILLS_BOOK.get(); }
+    public static int maxLevel(SkillId id) {
+        ModConfigSpec.IntValue value = MAX_LEVELS.get(id);
+        return value != null ? value.get() : (id == null ? 1 : id.defaultMaxLevel());
+    }
 }

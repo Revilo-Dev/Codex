@@ -9,7 +9,7 @@ import java.util.EnumMap;
 import java.util.List;
 
 public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
-    private static final int RECENT_COUNT = 3;
+    private static final int RECENT_COUNT = 4;
 
     private int points;
     private final EnumMap<AbilityId, Integer> ranks = new EnumMap<>(AbilityId.class);

@@ -48,8 +48,8 @@ public final class SkillsNetwork {
         PacketDistributor.sendToPlayer(player, new OpenSkillsBookPayload());
     }
 
-    public static void sendLevelUpToast(ServerPlayer player, int oldLevel, int newLevel) {
-        PacketDistributor.sendToPlayer(player, new LevelUpToastPayload(oldLevel, newLevel));
+    public static void sendLevelUpToast(ServerPlayer player, int oldLevel, int newLevel, int skillPointsGained, int abilityPointsGained) {
+        PacketDistributor.sendToPlayer(player, new LevelUpToastPayload(oldLevel, newLevel, skillPointsGained, abilityPointsGained));
     }
 
     private static void handleSync(SkillsSyncPayload payload, IPayloadContext ctx) {
@@ -77,7 +77,7 @@ public final class SkillsNetwork {
     private static void handleLevelUpToast(LevelUpToastPayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (ctx.player() != null && ctx.player().level().isClientSide()) {
-                ClientOnly.showLevelUpToast(payload.oldLevel(), payload.newLevel());
+                ClientOnly.showLevelUpToast(payload.oldLevel(), payload.newLevel(), payload.skillPointsGained(), payload.abilityPointsGained());
             }
         });
     }
@@ -148,7 +148,7 @@ public final class SkillsNetwork {
         @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     }
 
-    public record LevelUpToastPayload(int oldLevel, int newLevel) implements CustomPacketPayload {
+    public record LevelUpToastPayload(int oldLevel, int newLevel, int skillPointsGained, int abilityPointsGained) implements CustomPacketPayload {
         public static final Type<LevelUpToastPayload> TYPE =
                 new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "level_up_toast"));
 
@@ -157,8 +157,10 @@ public final class SkillsNetwork {
                         (buf, msg) -> {
                             buf.writeVarInt(msg.oldLevel);
                             buf.writeVarInt(msg.newLevel);
+                            buf.writeVarInt(msg.skillPointsGained);
+                            buf.writeVarInt(msg.abilityPointsGained);
                         },
-                        buf -> new LevelUpToastPayload(buf.readVarInt(), buf.readVarInt())
+                        buf -> new LevelUpToastPayload(buf.readVarInt(), buf.readVarInt(), buf.readVarInt(), buf.readVarInt())
                 );
 
         @Override
@@ -177,10 +179,9 @@ public final class SkillsNetwork {
         private static void afterSync() {
         }
 
-        private static void showLevelUpToast(int oldLevel, int newLevel) {
-            int levelsGained = Math.max(0, newLevel - oldLevel);
-            if (levelsGained <= 0) return;
-            LevelUpToast.show(newLevel, levelsGained);
+        private static void showLevelUpToast(int oldLevel, int newLevel, int skillPointsGained, int abilityPointsGained) {
+            if (newLevel <= oldLevel) return;
+            LevelUpToast.show(oldLevel, newLevel, skillPointsGained, abilityPointsGained);
         }
     }
 }

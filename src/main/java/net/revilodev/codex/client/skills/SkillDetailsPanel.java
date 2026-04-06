@@ -82,6 +82,10 @@ public final class SkillDetailsPanel extends AbstractWidget {
         return (upgrade.visible && upgrade.isMouseOver(mx, my)) || (downgrade.visible && downgrade.isMouseOver(mx, my));
     }
 
+    public boolean containsPoint(double mx, double my) {
+        return mx >= getX() && mx <= getX() + width && my >= getY() && my <= getY() + height;
+    }
+
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (!visible || !active || button != 0) return false;

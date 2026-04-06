@@ -9,10 +9,14 @@ public record AbilityDefinition(
         String description,
         ResourceLocation iconTexture,
         SkillId scalingSkill,
-        int maxRank,
+        int defaultMaxRank,
         int baseCooldownTicks
 ) {
     public static AbilityDefinition fromId(AbilityId id) {
         return new AbilityDefinition(id, id.title(), id.description(), id.iconTexture(), id.scalingSkill(), id.maxRank(), id.baseCooldownTicks());
+    }
+
+    public int maxRank() {
+        return id.maxRank();
     }
 }

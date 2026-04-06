@@ -23,6 +23,9 @@ import net.revilodev.codex.skills.SkillsAttachments;
 
 @OnlyIn(Dist.CLIENT)
 public final class AbilityDetailsPanel extends AbstractWidget {
+    private static final float SMALL_TEXT_SCALE = 0.62F;
+    private static final int CONTENT_TOP = 20;
+    private static final int CONTENT_BOTTOM_PADDING = 24;
     private static final ResourceLocation TEX_UP =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_upgrade_button.png");
     private static final ResourceLocation TEX_UP_HOVER =
@@ -74,6 +77,10 @@ public final class AbilityDetailsPanel extends AbstractWidget {
                 || (downgrade.visible && downgrade.isMouseOver(mx, my));
     }
 
+    public boolean containsPoint(double mx, double my) {
+        return mx >= getX() && mx <= getX() + width && my >= getY() && my <= getY() + height;
+    }
+
     @Override
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible || mc.player == null || ability == null) {
@@ -100,10 +107,10 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         drawScaledText(gg, "level: " + level + "/" + ability.maxRank(), x + 20, y + 11, 0xD0D0D0, 0.62F);
         drawRightScaledText(gg, "Keybind: " + bindLabel(ability.id()), x + w - 4, y + 5, 0xD0D0D0, 0.62F);
 
-        int viewportTop = y + 20;
-        int viewportBottom = y + height - 24;
+        int viewportTop = y + CONTENT_TOP;
+        int viewportBottom = y + height - CONTENT_BOTTOM_PADDING;
         int viewportHeight = Math.max(0, viewportBottom - viewportTop);
-        contentHeight = 86;
+        contentHeight = measureContentHeight(ability, Math.max(1, level), skills);
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
         scrollY = Mth.clamp(scrollY, 0.0F, maxScroll);
 
@@ -130,8 +137,8 @@ public final class AbilityDetailsPanel extends AbstractWidget {
 
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
         if (!visible || !active || ability == null) return false;
-        int viewportTop = getY() + 20;
-        int viewportBottom = getY() + height - 24;
+        int viewportTop = getY() + CONTENT_TOP;
+        int viewportBottom = getY() + height - CONTENT_BOTTOM_PADDING;
         if (mouseX < getX() || mouseX > getX() + width || mouseY < viewportTop || mouseY > viewportBottom) return false;
         int viewportHeight = Math.max(0, viewportBottom - viewportTop);
         int maxScroll = Math.max(0, contentHeight - viewportHeight);
@@ -147,16 +154,24 @@ public final class AbilityDetailsPanel extends AbstractWidget {
     @Override
     protected void updateWidgetNarration(NarrationElementOutput narration) {}
 
+    private int measureContentHeight(AbilityDefinition ability, int level, PlayerSkills skills) {
+        int scaledWidth = Math.max(1, Mth.floor((width - 8) / SMALL_TEXT_SCALE));
+        int lines = mc.font.split(Component.literal(ability.description()), scaledWidth).size();
+        lines += mc.font.split(Component.literal("Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), level, skills))), scaledWidth).size();
+        lines += mc.font.split(Component.literal("Scaling: " + AbilityScaling.summary(ability.id(), level, skills)), scaledWidth).size();
+        return lines * Math.max(1, Mth.ceil(mc.font.lineHeight * SMALL_TEXT_SCALE));
+    }
+
     private int drawSmallWrapped(GuiGraphics gg, String text, int x, int y, int width, int color) {
-        int scaledWidth = Math.max(1, Mth.floor(width / 0.62F));
+        int scaledWidth = Math.max(1, Mth.floor(width / SMALL_TEXT_SCALE));
         int yy = y;
         for (var line : mc.font.split(Component.literal(text), scaledWidth)) {
             gg.pose().pushPose();
             gg.pose().translate(x, yy, 0.0F);
-            gg.pose().scale(0.62F, 0.62F, 1.0F);
+            gg.pose().scale(SMALL_TEXT_SCALE, SMALL_TEXT_SCALE, 1.0F);
             gg.drawString(mc.font, line, 0, 0, color, false);
             gg.pose().popPose();
-            yy += Math.max(1, Mth.ceil(mc.font.lineHeight * 0.62F));
+            yy += Math.max(1, Mth.ceil(mc.font.lineHeight * SMALL_TEXT_SCALE));
         }
         return yy;
     }

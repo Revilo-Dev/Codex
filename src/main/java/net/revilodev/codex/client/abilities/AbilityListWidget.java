@@ -80,7 +80,8 @@ public final class AbilityListWidget extends AbstractWidget {
     }
 
     public static int gridHeight() {
-        return 2 * CELL_SIZE + GAP;
+        int rows = Math.max(1, (int) Math.ceil(AbilityRegistry.all().size() / 5.0D));
+        return rows * CELL_SIZE + Math.max(0, rows - 1) * GAP;
     }
 
     public static int preferredHeight() {

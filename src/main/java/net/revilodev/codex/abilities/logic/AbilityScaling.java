@@ -48,11 +48,11 @@ public final class AbilityScaling {
     }
 
     public static int warcryDurationTicks(int rank, PlayerSkills skills) {
-        return 80 + rank * 20 + (int) Math.round(primaryLevel(skills, SkillId.STRENGTH) * 5.0D * AbilityConfig.primaryScalingMultiplier());
+        return 200;
     }
 
     public static int warcryStrengthAmp(int rank, PlayerSkills skills) {
-        return rank >= 4 || primaryLevel(skills, SkillId.STRENGTH) >= 7 ? 1 : 0;
+        return Math.max(0, rank - 1);
     }
 
     public static float executionDamage(int rank, PlayerSkills skills) {
@@ -92,15 +92,72 @@ public final class AbilityScaling {
         return switch (id) {
             case DASH -> "Distance +" + fmt(dashDistance(rank, skills));
             case LEAP -> "Leap " + fmt(leapVertical(rank, skills)) + " up / " + fmt(leapForward(rank, skills)) + " forward";
+            case LUNGE -> "Dash " + fmt(lungeDistance(rank, skills)) + "m / " + fmt(lungeDamage(rank, skills)) + "+ speed dmg";
             case HEAL -> "Restore " + fmt(healAmount(rank, skills) / 2.0F) + " hearts";
             case CLEANSE -> "Remove debuffs and heal " + fmt(cleanseHeal(rank, skills) / 2.0F) + " hearts";
             case GUARD -> "Resist for " + fmt(guardDurationTicks(rank, skills) / 20.0D) + "s";
-            case WARCRY -> "Buff for " + fmt(warcryDurationTicks(rank, skills) / 20.0D) + "s";
+            case WARCRY -> "Strength " + (warcryStrengthAmp(rank, skills) + 1) + " for " + fmt(warcryDurationTicks(rank, skills) / 20.0D) + "s";
             case EXECUTION -> "Hit for " + fmt(executionDamage(rank, skills)) + " dmg";
             case CLEAVE -> "Arc hit " + fmt(cleaveRadius(rank)) + "m";
             case OVERPOWER -> "Smash for " + fmt(overpowerDamage(rank, skills)) + " dmg";
+            case BLAST -> "Burst " + fmt(blastRadius(rank, skills)) + "m / " + fmt(blastDamage(rank, skills)) + " dmg";
+            case BLAZE -> fmt(blazeRadius(rank, skills)) + "m fire ring / " + fmt(blazeBurnSeconds(rank)) + "s burn";
+            case GLACIER -> fmt(glacierDamage(rank, skills)) + " dmg / pierce " + glacierPierce(rank);
+            case SMITE -> smiteTargets(rank) + " bolts / " + fmt(smiteDamage(rank, skills)) + " dmg";
             case SCAVENGER -> fmt(magnetismDurationTicks(rank, skills) / 20.0D) + "s pull / " + fmt(magnetismRadius(rank, skills)) + "m";
         };
+    }
+
+    public static double lungeDistance(int rank, PlayerSkills skills) {
+        return 2.4D + rank * 0.5D + primaryLevel(skills, SkillId.AGILITY) * 0.08D * AbilityConfig.primaryScalingMultiplier();
+    }
+
+    public static float lungeDamage(int rank, PlayerSkills skills) {
+        return (float) (4.0D + rank + primaryLevel(skills, SkillId.AGILITY) * 0.35D * AbilityConfig.primaryScalingMultiplier());
+    }
+
+    public static float lungeSpeedDamageBonus(double horizontalSpeed) {
+        return (float) Math.max(0.0D, horizontalSpeed * 6.0D);
+    }
+
+    public static double lungeKnockback(int rank, PlayerSkills skills) {
+        return 0.5D + rank * 0.14D + primaryLevel(skills, SkillId.AGILITY) * 0.03D * AbilityConfig.primaryScalingMultiplier();
+    }
+
+    public static float blastDamage(int rank, PlayerSkills skills) {
+        return (float) (4.5D + rank * 1.3D + primaryLevel(skills, SkillId.STRENGTH) * 0.45D * AbilityConfig.primaryScalingMultiplier());
+    }
+
+    public static double blastRadius(int rank, PlayerSkills skills) {
+        return 2.6D + rank * 0.35D + primaryLevel(skills, SkillId.STRENGTH) * 0.04D * AbilityConfig.primaryScalingMultiplier();
+    }
+
+    public static double blazeRadius(int rank, PlayerSkills skills) {
+        return 2.5D + rank + primaryLevel(skills, SkillId.RESISTANCE) * 0.08D * AbilityConfig.primaryScalingMultiplier();
+    }
+
+    public static int blazeBurnSeconds(int rank) {
+        return 2 + rank;
+    }
+
+    public static float glacierDamage(int rank, PlayerSkills skills) {
+        return (float) (3.0D + rank + primaryLevel(skills, SkillId.LUCK) * 0.4D * AbilityConfig.primaryScalingMultiplier());
+    }
+
+    public static int glacierPierce(int rank) {
+        return Math.max(1, rank);
+    }
+
+    public static float smiteDamage(int rank, PlayerSkills skills) {
+        return (float) (5.0D + rank * 1.2D + primaryLevel(skills, SkillId.RESISTANCE) * 0.45D * AbilityConfig.primaryScalingMultiplier());
+    }
+
+    public static int smiteTargets(int rank) {
+        return 1 + Math.max(0, rank - 1);
+    }
+
+    public static double smiteRadius(int rank, PlayerSkills skills) {
+        return 6.0D + rank * 1.1D + primaryLevel(skills, SkillId.RESISTANCE) * 0.12D * AbilityConfig.primaryScalingMultiplier();
     }
 
     private static int primaryLevel(PlayerSkills skills, SkillId id) {

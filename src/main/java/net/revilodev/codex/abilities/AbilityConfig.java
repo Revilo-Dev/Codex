@@ -13,6 +13,7 @@ public final class AbilityConfig {
     private static final ModConfigSpec.BooleanValue HUD_ENABLED;
     private static final ModConfigSpec.BooleanValue HUD_TIMER_TEXT;
     private static final ModConfigSpec.IntValue MAX_SLOTS;
+    private static final EnumMap<AbilityId, ModConfigSpec.IntValue> MAX_RANKS = new EnumMap<>(AbilityId.class);
     private static final EnumMap<AbilityId, ModConfigSpec.BooleanValue> ENABLED = new EnumMap<>(AbilityId.class);
 
     static {
@@ -33,6 +34,12 @@ public final class AbilityConfig {
         builder.push("abilities");
         for (AbilityId id : AbilityId.values()) {
             ENABLED.put(id, builder.define(id.name().toLowerCase(java.util.Locale.ROOT), true));
+        }
+        builder.pop();
+
+        builder.push("maxRanks");
+        for (AbilityId id : AbilityId.values()) {
+            MAX_RANKS.put(id, builder.defineInRange(id.name().toLowerCase(java.util.Locale.ROOT), id.defaultMaxRank(), 1, 100));
         }
         builder.pop();
 
@@ -68,5 +75,10 @@ public final class AbilityConfig {
     public static boolean enabled(AbilityId id) {
         ModConfigSpec.BooleanValue value = ENABLED.get(id);
         return value != null && value.get();
+    }
+
+    public static int maxRank(AbilityId id) {
+        ModConfigSpec.IntValue value = MAX_RANKS.get(id);
+        return value != null ? value.get() : (id == null ? 1 : id.defaultMaxRank());
     }
 }

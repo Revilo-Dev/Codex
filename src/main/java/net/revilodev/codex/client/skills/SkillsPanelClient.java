@@ -63,8 +63,6 @@ public final class SkillsPanelClient {
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, SkillsPanelClient::onScreenRenderPost);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonPressed.Pre.class, SkillsPanelClient::onMousePressed);
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseDragged.Pre.class, SkillsPanelClient::onMouseDragged);
-        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonReleased.Pre.class, SkillsPanelClient::onMouseReleased);
     }
 
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -92,15 +90,6 @@ public final class SkillsPanelClient {
         st.skillsTab = new PanelTabButton(0, 0, PanelTab.SKILLS, () -> setTab(st, PanelTab.SKILLS));
         st.abilitiesTab = new PanelTabButton(0, 0, PanelTab.ABILITIES, () -> setTab(st, PanelTab.ABILITIES));
 
-        event.addListener(st.bg);
-        event.addListener(st.skillsList);
-        event.addListener(st.skillsDetails.upgradeButton());
-        event.addListener(st.skillsDetails.downgradeButton());
-        event.addListener(st.abilityList);
-        event.addListener(st.abilityDetails.upgradeButton());
-        event.addListener(st.abilityDetails.downgradeButton());
-        event.addListener(st.skillsTab);
-        event.addListener(st.abilitiesTab);
         event.addListener(st.btn);
 
         reposition(inv, st);
@@ -144,11 +133,23 @@ public final class SkillsPanelClient {
         Screen screen = event.getScreen();
         State st = STATES.get(screen);
         if (st == null || !st.open || !(screen instanceof InventoryScreen inv)) return;
-        if (st.activeTab == PanelTab.SKILLS && st.skillsDetails.visible) {
+        event.getGuiGraphics().pose().pushPose();
+        event.getGuiGraphics().pose().translate(0.0F, 0.0F, 400.0F);
+        st.bg.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        st.skillsTab.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        st.abilitiesTab.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        if (st.activeTab == PanelTab.SKILLS) {
+            st.skillsList.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
             st.skillsDetails.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
-        } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.visible) {
+            st.skillsDetails.upgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+            st.skillsDetails.downgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+        } else {
+            st.abilityList.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
             st.abilityDetails.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+            st.abilityDetails.upgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+            st.abilityDetails.downgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
         }
+        event.getGuiGraphics().pose().popPose();
         renderPointsBadge(event.getGuiGraphics(), st, inv);
     }
 
@@ -162,39 +163,53 @@ public final class SkillsPanelClient {
         boolean used = false;
 
         if (st.activeTab == PanelTab.SKILLS && st.skillsDetails.visible) {
-            used = st.skillsDetails.mouseScrolled(mx, my, deltaY) || st.skillsDetails.mouseScrolled(mx, my, 0.0, deltaY);
+            used = st.skillsDetails.mouseScrolled(mx, my, deltaY);
         } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.visible) {
-            used = st.abilityDetails.mouseScrolled(mx, my, deltaY) || st.abilityDetails.mouseScrolled(mx, my, 0.0, deltaY);
+            used = st.abilityDetails.mouseScrolled(mx, my, deltaY);
         }
 
         if (used) event.setCanceled(true);
-    }
-
-    public static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
     }
 
     public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre event) {
         State st = STATES.get(event.getScreen());
         if (st == null || !st.open || event.getButton() != 0) return;
 
+        double mouseX = event.getMouseX();
+        double mouseY = event.getMouseY();
+        if (st.skillsTab.mouseClicked(mouseX, mouseY, event.getButton()) || st.abilitiesTab.mouseClicked(mouseX, mouseY, event.getButton())) {
+            event.setCanceled(true);
+            return;
+        }
+
+        boolean used = false;
         if (st.activeTab == PanelTab.SKILLS && st.skillsDetails.hasSkill()) {
-            boolean inNode = st.skillsList.isOnSkillNode(event.getMouseX(), event.getMouseY());
-            boolean onButton = st.skillsDetails.isOnButtons(event.getMouseX(), event.getMouseY());
-            if (!inNode && !onButton) {
+            used = st.skillsDetails.mouseClicked(mouseX, mouseY, event.getButton()) || st.skillsList.mouseClicked(mouseX, mouseY, event.getButton());
+            boolean inNode = st.skillsList.isOnSkillNode(mouseX, mouseY);
+            boolean onButton = st.skillsDetails.isOnButtons(mouseX, mouseY);
+            boolean inDetails = st.skillsDetails.containsPoint(mouseX, mouseY);
+            if (!inNode && !onButton && !inDetails) {
                 st.skillsDetails.setSkill(null);
                 st.skillsList.setSelected(null);
             }
         } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.hasAbility()) {
-            boolean inNode = st.abilityList.isOnAbilityNode(event.getMouseX(), event.getMouseY());
-            boolean onButton = st.abilityDetails.isOnButtons(event.getMouseX(), event.getMouseY());
-            if (!inNode && !onButton) {
+            used = st.abilityDetails.mouseClicked(mouseX, mouseY, event.getButton()) || st.abilityList.mouseClicked(mouseX, mouseY, event.getButton());
+            boolean inNode = st.abilityList.isOnAbilityNode(mouseX, mouseY);
+            boolean onButton = st.abilityDetails.isOnButtons(mouseX, mouseY);
+            boolean inDetails = st.abilityDetails.containsPoint(mouseX, mouseY);
+            if (!inNode && !onButton && !inDetails) {
                 st.abilityDetails.setAbility(null);
                 st.abilityList.setSelected(null);
             }
+        } else if (st.activeTab == PanelTab.SKILLS) {
+            used = st.skillsList.mouseClicked(mouseX, mouseY, event.getButton()) || st.skillsDetails.mouseClicked(mouseX, mouseY, event.getButton());
+        } else {
+            used = st.abilityList.mouseClicked(mouseX, mouseY, event.getButton()) || st.abilityDetails.mouseClicked(mouseX, mouseY, event.getButton());
         }
-    }
 
-    public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
+        if (used || isInsideOverlay(st, mouseX, mouseY)) {
+            event.setCanceled(true);
+        }
     }
 
     private static void toggle(State st) {
@@ -403,6 +418,15 @@ public final class SkillsPanelClient {
 
         gg.drawString(mc.font, text, x + 14, y + 1, textColor, false);
         gg.drawString(mc.font, text, x + 13, y, 0x66F2D9FF, false);
+    }
+
+    private static boolean isInsideOverlay(State st, double mouseX, double mouseY) {
+        int left = st.bg.getX();
+        int top = st.bg.getY();
+        int right = left + PANEL_W;
+        int bottom = top + PANEL_H;
+        int tabLeft = left - 31;
+        return mouseX >= tabLeft && mouseX <= right && mouseY >= top && mouseY <= bottom;
     }
 
     private static final class PanelBackground extends AbstractWidget {

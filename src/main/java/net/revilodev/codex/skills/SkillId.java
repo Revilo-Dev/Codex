@@ -15,7 +15,7 @@ public enum SkillId {
     KNOCKBACK_RESISTANCE(SkillCategory.RESISTANCE, false, RESISTANCE, "Knockback Resistance", "+1 knockback resistance per level", "resistance-knockback", 5),
 
     AGILITY(SkillCategory.AGILITY, true, null, "Agility", "+10% speed per level", "agility", 10),
-    LEAPING(SkillCategory.AGILITY, false, AGILITY, "Leaping", "+10% jump height per level", "agility-jump", 5),
+    LEAPING(SkillCategory.AGILITY, false, AGILITY, "Leaping", "+20% jump height per level", "agility-jump", 5),
 
     VITALITY(SkillCategory.VITALITY, true, null, "Vitality", "+1 heart per level", "vitaility", 10),
     REGENERATION(SkillCategory.VITALITY, false, VITALITY, "Regeneration", "+1 regen (5%)", "vitaility-regen", 5),
@@ -32,7 +32,7 @@ public enum SkillId {
     private final String title;
     private final String description;
     private final ResourceLocation icon;
-    private final int maxLevel;
+    private final int defaultMaxLevel;
 
     SkillId(SkillCategory category, boolean primary, SkillId parent, String title, String description, String iconPath, int maxLevel) {
         this.category = category;
@@ -41,7 +41,7 @@ public enum SkillId {
         this.title = title;
         this.description = description;
         this.icon = ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/skills/" + iconPath + ".png");
-        this.maxLevel = maxLevel;
+        this.defaultMaxLevel = maxLevel;
     }
 
     public SkillCategory category() { return category; }
@@ -51,7 +51,8 @@ public enum SkillId {
     public String title() { return title; }
     public ResourceLocation icon() { return icon; }
     public String description() { return description; }
-    public int maxLevel() { return maxLevel; }
+    public int maxLevel() { return SkillConfig.maxLevel(this); }
+    public int defaultMaxLevel() { return defaultMaxLevel; }
 
     public static SkillId byOrdinal(int ord) {
         SkillId[] v = values();

@@ -14,10 +14,14 @@ public record SkillDefinition(
         String title,
         ResourceLocation icon,
         String description,
-        int maxLevel
+        int defaultMaxLevel
 ) {
     public boolean secondary() {
         return !primary;
+    }
+
+    public int maxLevel() {
+        return id.maxLevel();
     }
 
     public Optional<Item> iconItem() {

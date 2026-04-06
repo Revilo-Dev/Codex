@@ -1,7 +1,9 @@
 package net.revilodev.codex.item;
 
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.neoforged.bus.api.IEventBus;
+import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.DeferredItem;
 import net.revilodev.codex.CodexMod;
@@ -16,5 +18,12 @@ public final class ModItems {
 
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
+        bus.addListener(ModItems::addToCreativeTabs);
+    }
+
+    private static void addToCreativeTabs(BuildCreativeModeTabContentsEvent event) {
+        if (event.getTabKey() == CreativeModeTabs.INGREDIENTS) {
+            event.accept(SKILLS_BOOK.get());
+        }
     }
 }

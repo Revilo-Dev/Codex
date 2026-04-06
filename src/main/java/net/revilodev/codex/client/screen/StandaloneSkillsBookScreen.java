@@ -123,14 +123,16 @@ public final class StandaloneSkillsBookScreen extends Screen {
             if (activeTab == PanelTab.SKILLS && skillsDetails.hasSkill()) {
                 boolean inListNode = skillsList.isOnSkillNode(mouseX, mouseY);
                 boolean onButton = skillsDetails.isOnButtons(mouseX, mouseY);
-                if (!inListNode && !onButton) {
+                boolean inDetails = skillsDetails.containsPoint(mouseX, mouseY);
+                if (!inListNode && !onButton && !inDetails) {
                     skillsDetails.setSkill(null);
                     skillsList.setSelected(null);
                 }
             } else if (activeTab == PanelTab.ABILITIES && abilityDetails.hasAbility()) {
                 boolean inListNode = abilityList.isOnAbilityNode(mouseX, mouseY);
                 boolean onButton = abilityDetails.isOnButtons(mouseX, mouseY);
-                if (!inListNode && !onButton) {
+                boolean inDetails = abilityDetails.containsPoint(mouseX, mouseY);
+                if (!inListNode && !onButton && !inDetails) {
                     abilityDetails.setAbility(null);
                     abilityList.setSelected(null);
                 }

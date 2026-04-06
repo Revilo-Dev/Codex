@@ -2,13 +2,10 @@ package net.revilodev.codex.abilities;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
@@ -16,7 +13,6 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.abilities.logic.AbilityLogic;
 import net.revilodev.codex.abilities.logic.AbilitySyncEvents;
-import net.revilodev.codex.client.toast.SkillPointToast;
 
 public final class AbilitiesNetwork {
     private static final String VERSION = "1";
@@ -30,7 +26,6 @@ public final class AbilitiesNetwork {
 
         PayloadRegistrar registrar = event.registrar(CodexMod.MOD_ID).versioned(VERSION);
         registrar.playToClient(AbilitiesSyncPayload.TYPE, AbilitiesSyncPayload.STREAM_CODEC, AbilitiesNetwork::handleSync);
-        registrar.playToClient(AbilityPointToastPayload.TYPE, AbilityPointToastPayload.STREAM_CODEC, AbilitiesNetwork::handleToast);
         registrar.playToServer(AbilityActionPayload.TYPE, AbilityActionPayload.STREAM_CODEC, AbilitiesNetwork::handleAction);
         registrar.playToServer(AbilityUsePayload.TYPE, AbilityUsePayload.STREAM_CODEC, AbilitiesNetwork::handleUse);
     }
@@ -40,10 +35,6 @@ public final class AbilitiesNetwork {
         PacketDistributor.sendToPlayer(player, new AbilitiesSyncPayload(abilities.serializeNBT(player.level().registryAccess())));
     }
 
-    public static void sendAbilityPointToast(ServerPlayer player, int delta, int total) {
-        PacketDistributor.sendToPlayer(player, new AbilityPointToastPayload(delta, total));
-    }
-
     private static void handleSync(AbilitiesSyncPayload payload, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (ctx.player() == null) return;
@@ -51,14 +42,6 @@ public final class AbilitiesNetwork {
             CompoundTag tag = payload.data();
             if (tag == null) tag = new CompoundTag();
             abilities.deserializeNBT(ctx.player().level().registryAccess(), tag);
-        });
-    }
-
-    private static void handleToast(AbilityPointToastPayload payload, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> {
-            if (ctx.player() != null && ctx.player().level().isClientSide()) {
-                ClientOnly.showAbilityPointToast(payload.delta(), payload.total());
-            }
         });
     }
 
@@ -138,29 +121,4 @@ public final class AbilitiesNetwork {
         }
     }
 
-    public record AbilityPointToastPayload(int delta, int total) implements CustomPacketPayload {
-        public static final Type<AbilityPointToastPayload> TYPE =
-                new Type<>(ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "ability_points_toast"));
-
-        public static final StreamCodec<RegistryFriendlyByteBuf, AbilityPointToastPayload> STREAM_CODEC =
-                StreamCodec.of(
-                        (buf, msg) -> {
-                            buf.writeVarInt(msg.delta);
-                            buf.writeVarInt(msg.total);
-                        },
-                        buf -> new AbilityPointToastPayload(buf.readVarInt(), buf.readVarInt())
-                );
-
-        @Override
-        public Type<? extends CustomPacketPayload> type() {
-            return TYPE;
-        }
-    }
-
-    @OnlyIn(Dist.CLIENT)
-    private static final class ClientOnly {
-        private static void showAbilityPointToast(int delta, int total) {
-            SkillPointToast.showGlobal(delta, total, Component.literal("Ability point earned"));
-        }
-    }
 }

@@ -2,10 +2,13 @@ package net.revilodev.codex.skills.logic;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
+import net.revilodev.codex.item.ModItems;
 import net.revilodev.codex.skills.PlayerSkills;
+import net.revilodev.codex.skills.SkillConfig;
 import net.revilodev.codex.skills.SkillsAttachments;
 import net.revilodev.codex.skills.SkillsNetwork;
 
@@ -30,6 +33,7 @@ public final class SkillSyncEvents {
 
     private static void onLogin(PlayerEvent.PlayerLoggedInEvent e) {
         if (!(e.getEntity() instanceof ServerPlayer sp)) return;
+        giveStartingBook(sp);
         applyEffectsNow(sp);
         markDirty(sp);
     }
@@ -58,5 +62,19 @@ public final class SkillSyncEvents {
     private static void applyEffectsNow(ServerPlayer sp) {
         PlayerSkills skills = sp.getData(SkillsAttachments.PLAYER_SKILLS.get());
         SkillLogic.applyAllEffects(sp, skills);
+    }
+
+    private static void giveStartingBook(ServerPlayer sp) {
+        if (!SkillConfig.spawnWithSkillsBook()) return;
+
+        var persistent = sp.getPersistentData();
+        if (persistent.getBoolean("codex_received_skills_book")) return;
+
+        ItemStack stack = new ItemStack(ModItems.SKILLS_BOOK.get());
+        boolean added = sp.getInventory().add(stack);
+        if (!added && !stack.isEmpty()) {
+            sp.drop(stack, false);
+        }
+        persistent.putBoolean("codex_received_skills_book", true);
     }
 }

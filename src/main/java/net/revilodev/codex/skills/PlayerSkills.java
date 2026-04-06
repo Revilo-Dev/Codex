@@ -141,7 +141,7 @@ public final class PlayerSkills implements INBTSerializable<CompoundTag> {
         if (nbt.contains("l")) {
             CompoundTag l = nbt.getCompound("l");
             for (SkillId id : SkillId.values()) {
-                if (l.contains(id.name())) levels.put(id, Math.max(0, l.getInt(id.name())));
+                if (l.contains(id.name())) levels.put(id, Math.max(0, Math.min(id.maxLevel(), l.getInt(id.name()))));
             }
         }
 
