@@ -41,6 +41,7 @@ public final class AbilityListWidget extends AbstractWidget {
     private final List<Node> nodes = new ArrayList<>();
     private AbilityId selected;
     private boolean headerVisible = true;
+    private boolean showLocked = true;
 
     public AbilityListWidget(int x, int y, int w, int h, Consumer<AbilityDefinition> onClick) {
         super(x, y, w, h, Component.empty());
@@ -50,9 +51,19 @@ public final class AbilityListWidget extends AbstractWidget {
 
     public void reloadAbilities() {
         nodes.clear();
-        List<AbilityDefinition> all = AbilityRegistry.all();
-        for (int i = 0; i < all.size(); i++) {
-            nodes.add(new Node(all.get(i), i % 5, i / 5));
+        List<AbilityDefinition> visibleAbilities = AbilityRegistry.all();
+        if (!showLocked && mc.player != null) {
+            PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+            visibleAbilities = visibleAbilities.stream()
+                    .filter(def -> abilities.unlocked(def.id()))
+                    .toList();
+            if (selected != null && visibleAbilities.stream().noneMatch(def -> def.id() == selected)) {
+                selected = null;
+                if (onClick != null) onClick.accept(null);
+            }
+        }
+        for (int i = 0; i < visibleAbilities.size(); i++) {
+            nodes.add(new Node(visibleAbilities.get(i), i % 5, i / 5));
         }
     }
 
@@ -69,6 +80,11 @@ public final class AbilityListWidget extends AbstractWidget {
 
     public void setHeaderVisible(boolean headerVisible) {
         this.headerVisible = headerVisible;
+    }
+
+    public void setShowLocked(boolean showLocked) {
+        this.showLocked = showLocked;
+        reloadAbilities();
     }
 
     public boolean isOnAbilityNode(double mx, double my) {
@@ -92,6 +108,9 @@ public final class AbilityListWidget extends AbstractWidget {
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible || mc.player == null) return;
         PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+        if (!showLocked) {
+            reloadAbilities();
+        }
         if (headerVisible) {
             drawScaledText(gg, "Ability Points: " + abilities.points(), getX() + 1, getY() + 4, 0xC78CFF, 0.85F);
         }

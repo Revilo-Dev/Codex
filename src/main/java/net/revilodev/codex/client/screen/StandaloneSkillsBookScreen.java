@@ -69,6 +69,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
             abilityDetails.setAbility(def);
             abilityList.setSelected(def == null ? null : def.id());
         });
+        abilityList.setShowLocked(false);
         abilityDetails = new AbilityDetailsPanel(detailsX, detailsY, detailsW, detailsH);
 
         skillsTab = new PanelTabButton(panelX - 31, panelY + 6, PanelTab.SKILLS, () -> setTab(PanelTab.SKILLS));
