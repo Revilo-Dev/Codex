@@ -16,9 +16,9 @@ public final class LevelUpToast {
     private static final int BOX_HEIGHT = 32;
     private static final int RIGHT_MARGIN = 8;
     private static final int TOP_MARGIN = 8;
-    private static final int TITLE_COLOR = 0xF4C542;
-    private static final int SKILL_COLOR = 0x66B8FF;
-    private static final int ABILITY_COLOR = 0xC78CFF;
+    private static final int TITLE_COLOR = 0x000000;
+    private static final int SKILL_COLOR = 0x1F4E8C;
+    private static final int ABILITY_COLOR = 0x7A3DB8;
 
     private static Component title = Component.empty();
     private static Component skillLine = Component.empty();

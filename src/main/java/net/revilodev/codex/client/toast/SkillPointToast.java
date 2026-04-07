@@ -14,6 +14,8 @@ public final class SkillPointToast implements Toast {
     private static final Object GLOBAL_TOKEN = new Object();
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath("codex", "textures/gui/sprites/skill_toast.png");
     private static final long DISPLAY_TIME_MS = 5000L;
+    private static final int TITLE_COLOR = 0x000000;
+    private static final int SUBTITLE_COLOR = 0x1F4E8C;
     private final SkillCategory category;
     private final Object token;
     private final Component title;
@@ -88,8 +90,8 @@ public final class SkillPointToast implements Toast {
         }
         gg.blit(TEXTURE, 0, 0, 0, 0, this.width(), this.height(), this.width(), this.height());
         if (icon != null) gg.renderItem(new ItemStack(icon), 6, 6);
-        gg.drawString(Minecraft.getInstance().font, title, 30, 7, 0x242424, false);
-        gg.drawString(Minecraft.getInstance().font, subtitle, 30, 18, 0x8f8f8f, false);
+        gg.drawString(Minecraft.getInstance().font, title, 30, 7, TITLE_COLOR, false);
+        gg.drawString(Minecraft.getInstance().font, subtitle, 30, 18, SUBTITLE_COLOR, false);
         return time - lastChanged >= DISPLAY_TIME_MS ? Visibility.HIDE : Visibility.SHOW;
     }
 

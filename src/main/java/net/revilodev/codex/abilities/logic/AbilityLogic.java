@@ -13,8 +13,12 @@ import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.ai.attributes.AttributeModifier;
+import net.minecraft.world.entity.ai.attributes.Attributes;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.LightningBolt;
+import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.revilodev.codex.abilities.AbilitiesAttachments;
@@ -26,6 +30,7 @@ import net.revilodev.codex.skills.SkillsAttachments;
 
 import java.util.Comparator;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class AbilityLogic {
     private AbilityLogic() {}
@@ -101,7 +106,7 @@ public final class AbilityLogic {
         player.setDeltaMovement(motion.x, 0.18D, motion.z);
         player.hurtMarked = true;
         float speedBonus = AbilityScaling.lungeSpeedDamageBonus(new Vec3(motion.x, 0.0D, motion.z).length());
-        target.hurt(player.damageSources().playerAttack(player), AbilityScaling.lungeDamage(rank, skills) + speedBonus);
+        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.lungeDamage(rank, skills) + speedBonus));
         knockbackFrom(player, target, AbilityScaling.lungeKnockback(rank, skills));
         line(player, ParticleTypes.SWEEP_ATTACK, player.position().add(0.0D, 1.0D, 0.0D), target.position().add(0.0D, 1.0D, 0.0D), 7);
         burst(player, ParticleTypes.CLOUD, 10, 0.2D, 0.1D, 0.2D, 0.01D);
@@ -165,7 +170,7 @@ public final class AbilityLogic {
         if (target.getHealth() <= target.getMaxHealth() * 0.35F) {
             damage *= AbilityScaling.executionMissingHealthBonus(rank);
         }
-        target.hurt(player.damageSources().playerAttack(player), damage);
+        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
         burst(player, ParticleTypes.CRIT, 12, 0.2D, 0.2D, 0.2D, 0.15D);
         play(player, SoundEvents.PLAYER_ATTACK_CRIT);
         return true;
@@ -179,7 +184,7 @@ public final class AbilityLogic {
         if (targets.isEmpty()) return false;
         float damage = AbilityScaling.cleaveDamage(rank, skills);
         for (LivingEntity target : targets) {
-            target.hurt(player.damageSources().playerAttack(player), damage);
+            target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
             knockbackFrom(player, target, 0.25D + rank * 0.05D);
         }
         ring(player, ParticleTypes.SWEEP_ATTACK, 9, 1.2D);
@@ -190,7 +195,7 @@ public final class AbilityLogic {
     private static boolean overpower(ServerPlayer player, int rank, PlayerSkills skills) {
         LivingEntity target = target(player, 4.0D);
         if (target == null) return false;
-        target.hurt(player.damageSources().playerAttack(player), AbilityScaling.overpowerDamage(rank, skills));
+        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.overpowerDamage(rank, skills)));
         knockbackFrom(player, target, AbilityScaling.overpowerKnockback(rank, skills));
         target.setDeltaMovement(target.getDeltaMovement().add(0.0D, 0.16D + rank * 0.03D, 0.0D));
         burstAt(player, target.position().add(0.0D, 0.6D, 0.0D), ParticleTypes.CRIT, 14, 0.15D, 0.2D, 0.15D, 0.18D);
@@ -208,7 +213,7 @@ public final class AbilityLogic {
         if (targets.isEmpty()) return false;
 
         for (LivingEntity target : targets) {
-            target.hurt(player.damageSources().explosion(player, player), AbilityScaling.blastDamage(rank, skills));
+            target.hurt(player.damageSources().explosion(player, player), weaponScaledDamage(player, AbilityScaling.blastDamage(rank, skills)));
             knockbackFrom(player, target, 0.35D + rank * 0.08D);
         }
 
@@ -234,7 +239,7 @@ public final class AbilityLogic {
         for (LivingEntity target : targets) {
             target.igniteForSeconds(fireSeconds);
             if (soulFire) {
-                target.hurt(player.damageSources().magic(), 2.0F);
+                target.hurt(player.damageSources().magic(), weaponScaledDamage(player, 2.0F));
             }
         }
 
@@ -262,7 +267,7 @@ public final class AbilityLogic {
         float damage = AbilityScaling.glacierDamage(rank, skills);
         boolean hitAny = false;
         for (LivingEntity hit : hits) {
-            hit.hurt(player.damageSources().playerAttack(player), damage);
+            hit.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
             burstAt(player, hit.position().add(0.0D, 0.8D, 0.0D), ParticleTypes.SNOWFLAKE, 8, 0.12D, 0.18D, 0.12D, 0.01D);
             hitAny = true;
             remainingPierce--;
@@ -281,7 +286,7 @@ public final class AbilityLogic {
         List<LivingEntity> targets = player.level().getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
-                entity -> entity != player && entity.isAlive()
+                entity -> entity != player && entity.isAlive() && entity instanceof Enemy
         ).stream()
                 .sorted(Comparator.comparingDouble(LivingEntity::getMaxHealth).reversed())
                 .limit(AbilityScaling.smiteTargets(rank))
@@ -292,7 +297,7 @@ public final class AbilityLogic {
         float damage = AbilityScaling.smiteDamage(rank, skills);
         for (LivingEntity target : targets) {
             spawnVisualLightning(player, target, blueLightning);
-            target.hurt(player.damageSources().magic(), damage);
+            target.hurt(player.damageSources().magic(), weaponScaledDamage(player, damage));
             burstAt(player, target.position().add(0.0D, 1.0D, 0.0D), blueLightning ? ParticleTypes.SOUL_FIRE_FLAME : ParticleTypes.ELECTRIC_SPARK, 18, 0.25D, 0.6D, 0.25D, 0.02D);
         }
         play(player, SoundEvents.LIGHTNING_BOLT_THUNDER);
@@ -351,6 +356,25 @@ public final class AbilityLogic {
         horizontal = horizontal.normalize().scale(strength);
         target.push(horizontal.x, 0.1D, horizontal.z);
         target.hurtMarked = true;
+    }
+
+    private static float weaponScaledDamage(ServerPlayer player, float baseDamage) {
+        return baseDamage + heldWeaponAttackDamage(player);
+    }
+
+    private static float heldWeaponAttackDamage(ServerPlayer player) {
+        if (player == null) return 0.0F;
+
+        AtomicReference<Double> bonus = new AtomicReference<>(0.0D);
+        player.getMainHandItem().forEachModifier(EquipmentSlot.MAINHAND, (attribute, modifier) -> {
+            if (!attribute.is(Attributes.ATTACK_DAMAGE)) return;
+
+            double current = bonus.get();
+            if (modifier.operation() == AttributeModifier.Operation.ADD_VALUE) {
+                bonus.set(current + modifier.amount());
+            }
+        });
+        return Math.max(0.0F, bonus.get().floatValue());
     }
 
     private static void play(ServerPlayer player, SoundEvent sound) {

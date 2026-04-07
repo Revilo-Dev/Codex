@@ -13,7 +13,7 @@ public record AbilityDefinition(
         int baseCooldownTicks
 ) {
     public static AbilityDefinition fromId(AbilityId id) {
-        return new AbilityDefinition(id, id.title(), id.description(), id.iconTexture(), id.scalingSkill(), id.maxRank(), id.baseCooldownTicks());
+        return new AbilityDefinition(id, id.title(), id.description(), id.iconTexture(), id.scalingSkill(), id.defaultMaxRank(), id.baseCooldownTicks());
     }
 
     public int maxRank() {

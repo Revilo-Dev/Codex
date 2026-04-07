@@ -21,7 +21,7 @@ public final class SkillRegistry {
         List<SkillDefinition> primaries = new java.util.ArrayList<>();
         EnumMap<SkillId, java.util.ArrayList<SkillDefinition>> secondaryLists = new EnumMap<>(SkillId.class);
         for (SkillId id : SkillId.values()) {
-            SkillDefinition def = new SkillDefinition(id, id.category(), id.primary(), id.parent(), id.title(), id.icon(), id.description(), id.maxLevel());
+            SkillDefinition def = new SkillDefinition(id, id.category(), id.primary(), id.parent(), id.title(), id.icon(), id.description(), id.defaultMaxLevel());
             DEFINITIONS.put(id, def);
             BY_CATEGORY.get(id.category()).add(def);
             if (def.primary()) {

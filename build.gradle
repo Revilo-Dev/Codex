@@ -59,8 +59,8 @@ configurations {
 
 dependencies {
     implementation "net.neoforged:neoforge:${neo_version}"
-    compileOnly files("build/libs/levelup-1.0.0.jar")
-    localRuntime files("build/libs/levelup-1.0.0.jar")
+    compileOnly files("runs/client/mods/levelup-1.1.jar")
+    localRuntime files("runs/client/mods/levelup-1.1.jar")
 }
 
 // Replace properties inside neoforge.mods.toml with gradle.properties values
