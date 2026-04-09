@@ -24,8 +24,11 @@ import net.revilodev.codex.skills.SkillsAttachments;
 @OnlyIn(Dist.CLIENT)
 public final class AbilityDetailsPanel extends AbstractWidget {
     private static final float SMALL_TEXT_SCALE = 0.62F;
+    private static final float HEADER_TEXT_SCALE = 0.62F;
     private static final int CONTENT_TOP = 20;
     private static final int CONTENT_BOTTOM_PADDING = 24;
+    private static final int HEADER_ICON_SIZE = 12;
+    private static final int SMALL_LINE_STEP = 5;
     private static final ResourceLocation TEX_UP =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_upgrade_button.png");
     private static final ResourceLocation TEX_UP_HOVER =
@@ -102,9 +105,9 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         boolean canUp = level < ability.maxRank() && abilities.points() > 0;
         boolean canDown = level > 0;
 
-        gg.blit(ability.iconTexture(), x + 4, y + 4, 0, 0, 16, 16, 16, 16);
-        drawScaledText(gg, ability.title(), x + 20, y + 5, 0xFFFFFF, 0.62F);
-        drawScaledText(gg, "level: " + level + "/" + ability.maxRank(), x + 20, y + 11, 0xD0D0D0, 0.62F);
+        gg.blit(ability.iconTexture(), x + 3, y + 4, 0, 0, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE);
+        drawScaledText(gg, ability.title(), x + 17, y + 5, 0xFFFFFF, HEADER_TEXT_SCALE);
+        drawScaledText(gg, "level: " + level + "/" + ability.maxRank(), x + 17, y + 11, 0xD0D0D0, HEADER_TEXT_SCALE);
         drawRightScaledText(gg, "Keybind: " + bindLabel(ability.id()), x + w - 4, y + 5, 0xD0D0D0, 0.62F);
 
         int viewportTop = y + CONTENT_TOP;
@@ -116,8 +119,8 @@ public final class AbilityDetailsPanel extends AbstractWidget {
 
         gg.enableScissor(x + 2, viewportTop, x + w - 2, viewportBottom);
         int textY = viewportTop - Mth.floor(scrollY);
-        textY = drawSmallWrapped(gg, ability.description(), x + 4, textY, w - 8, 0xE2E2E2) + 4;
-        textY = drawSmallWrapped(gg, "Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), Math.max(1, level), skills)), x + 4, textY, w - 8, 0xA6D9FF) + 4;
+        textY = drawSmallWrapped(gg, ability.description(), x + 4, textY, w - 8, 0xE2E2E2) + 3;
+        textY = drawSmallWrapped(gg, "Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), Math.max(1, level), skills)), x + 4, textY, w - 8, 0xA6D9FF) + 3;
         drawSmallWrapped(gg, "Scaling: " + AbilityScaling.summary(ability.id(), Math.max(1, level), skills), x + 4, textY, w - 8, 0xA6D9FF);
         gg.disableScissor();
 
@@ -159,7 +162,7 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         int lines = mc.font.split(Component.literal(ability.description()), scaledWidth).size();
         lines += mc.font.split(Component.literal("Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), level, skills))), scaledWidth).size();
         lines += mc.font.split(Component.literal("Scaling: " + AbilityScaling.summary(ability.id(), level, skills)), scaledWidth).size();
-        return lines * Math.max(1, Mth.ceil(mc.font.lineHeight * SMALL_TEXT_SCALE));
+        return lines * SMALL_LINE_STEP;
     }
 
     private int drawSmallWrapped(GuiGraphics gg, String text, int x, int y, int width, int color) {
@@ -171,7 +174,7 @@ public final class AbilityDetailsPanel extends AbstractWidget {
             gg.pose().scale(SMALL_TEXT_SCALE, SMALL_TEXT_SCALE, 1.0F);
             gg.drawString(mc.font, line, 0, 0, color, false);
             gg.pose().popPose();
-            yy += Math.max(1, Mth.ceil(mc.font.lineHeight * SMALL_TEXT_SCALE));
+            yy += SMALL_LINE_STEP;
         }
         return yy;
     }
@@ -230,7 +233,7 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
             ResourceLocation tex = !active ? TEX_DOWN_DISABLED : (isMouseOver(mouseX, mouseY) ? TEX_DOWN_HOVER : TEX_DOWN);
             gg.blit(tex, getX(), getY(), 0, 0, width, height, width, height);
-            drawScaledText(gg, getMessage().getString(), getX() + 10, getY() + 6, active ? 0xFFFFFF : 0x808080, 0.62F);
+            drawScaledText(gg, getMessage().getString(), getX() + 13, getY() + 6, active ? 0xFFFFFF : 0x808080, 0.62F);
         }
 
         @Override

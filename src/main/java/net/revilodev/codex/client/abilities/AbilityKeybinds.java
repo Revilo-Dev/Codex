@@ -107,7 +107,7 @@ public final class AbilityKeybinds {
         add(AbilityId.BLAZE, "blaze", InputConstants.KEY_U);
         add(AbilityId.GLACIER, "glacier", InputConstants.KEY_I);
         add(AbilityId.SMITE, "smite", InputConstants.KEY_O);
-        add(AbilityId.SCAVENGER, "magnetism", InputConstants.KEY_L);
+        add(AbilityId.SCAVENGER, "toxic", InputConstants.KEY_L);
     }
 
     private static void add(AbilityId id, String keyName, int defaultKey) {
@@ -133,14 +133,14 @@ public final class AbilityKeybinds {
         }
         if (mc.player == null) return AbilityUseFail.NO_TARGET;
         return switch (id) {
-            case LUNGE -> hasTarget(mc, AbilityScaling.lungeDistance(Math.max(1, data.rank(id)), null)) ? null : AbilityUseFail.NO_TARGET;
+            case LUNGE -> hasTarget(mc, AbilityScaling.lungeDistance(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
             case EXECUTION -> hasTarget(mc, 4.5D) ? null : AbilityUseFail.NO_TARGET;
             case OVERPOWER -> hasTarget(mc, 4.0D) ? null : AbilityUseFail.NO_TARGET;
             case GLACIER -> hasTarget(mc, 12.0D) ? null : AbilityUseFail.NO_TARGET;
-            case SMITE -> hasNearby(mc, AbilityScaling.smiteRadius(Math.max(1, data.rank(id)), null)) ? null : AbilityUseFail.NO_TARGET;
-            case CLEAVE -> hasNearbyInFront(mc, AbilityScaling.cleaveRadius(Math.max(1, data.rank(id)))) ? null : AbilityUseFail.NO_TARGET;
-            case BLAST -> hasNearby(mc, AbilityScaling.blastRadius(Math.max(1, data.rank(id)), null)) ? null : AbilityUseFail.NO_TARGET;
-            case BLAZE -> hasNearby(mc, AbilityScaling.blazeRadius(Math.max(1, data.rank(id)), null)) ? null : AbilityUseFail.NO_TARGET;
+            case SMITE -> hasNearby(mc, AbilityScaling.smiteRadius(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
+            case CLEAVE -> hasNearbyInFront(mc, AbilityScaling.cleaveRadius(Math.max(1, data.rank(id)), 1.0D)) ? null : AbilityUseFail.NO_TARGET;
+            case BLAST -> hasNearby(mc, AbilityScaling.blastRadius(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
+            case BLAZE -> hasNearby(mc, AbilityScaling.blazeRadius(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
             default -> null;
         };
     }

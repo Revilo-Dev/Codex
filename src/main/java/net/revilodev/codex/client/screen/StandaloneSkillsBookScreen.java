@@ -56,7 +56,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
         int detailsH = panelHeight / 3 + 10;
         int detailsW = Math.max(20, (innerRight - innerLeft) - 5);
         int detailsX = innerLeft + 2;
-        int detailsY = innerBottom - detailsH;
+        int detailsY = innerBottom - detailsH - 5;
 
         skillsList = new SkillListWidget(panelX + (panelWidth - SkillListWidget.gridWidth()) / 2, innerTop, SkillListWidget.gridWidth(), SkillListWidget.preferredHeight(), def -> {
             skillsDetails.setSkill(def);
@@ -69,7 +69,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
             abilityDetails.setAbility(def);
             abilityList.setSelected(def == null ? null : def.id());
         });
-        abilityList.setShowLocked(false);
+        abilityList.setShowLocked(true);
         abilityDetails = new AbilityDetailsPanel(detailsX, detailsY, detailsW, detailsH);
 
         skillsTab = new PanelTabButton(panelX - 31, panelY + 6, PanelTab.SKILLS, () -> setTab(PanelTab.SKILLS));

@@ -12,7 +12,6 @@ import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.ai.attributes.AttributeModifier;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.entity.monster.Enemy;
@@ -21,12 +20,16 @@ import net.minecraft.world.entity.LightningBolt;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.neoforge.common.NeoForge;
 import net.revilodev.codex.abilities.AbilitiesAttachments;
 import net.revilodev.codex.abilities.AbilityConfig;
 import net.revilodev.codex.abilities.AbilityId;
 import net.revilodev.codex.abilities.PlayerAbilities;
+import net.revilodev.codex.abilities.event.AbilityUseEvent;
+import net.revilodev.codex.attributes.CodexAttributes;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillsAttachments;
+import net.revilodev.codex.stats.CodexStats;
 
 import java.util.Comparator;
 import java.util.List;
@@ -45,37 +48,45 @@ public final class AbilityLogic {
         if (rank <= 0 || abilities.cooldownTicks(id) > 0) return false;
 
         PlayerSkills skills = player.getData(SkillsAttachments.PLAYER_SKILLS.get());
-        boolean executed = execute(player, id, rank, skills);
+        double abilityPower = CodexAttributes.abilityPower(player, id);
+        AbilityUseEvent.Pre preEvent = new AbilityUseEvent.Pre(player, id, rank, skills, abilityPower);
+        if (NeoForge.EVENT_BUS.post(preEvent).isCanceled()) return false;
+
+        abilityPower = preEvent.getAbilityPower();
+        boolean executed = execute(player, id, rank, skills, abilityPower);
         if (!executed) return false;
 
         abilities.setCooldown(id, AbilityScaling.cooldownTicks(id, rank, skills));
         abilities.markUsed(id);
+        player.awardStat(CodexStats.ABILITIES_USED);
+        player.awardStat(CodexStats.abilityUse(id));
+        NeoForge.EVENT_BUS.post(new AbilityUseEvent.Post(player, id, rank, skills, abilityPower));
         return true;
     }
 
-    private static boolean execute(ServerPlayer player, AbilityId id, int rank, PlayerSkills skills) {
+    private static boolean execute(ServerPlayer player, AbilityId id, int rank, PlayerSkills skills, double abilityPower) {
         return switch (id) {
-            case DASH -> dash(player, rank, skills);
-            case LEAP -> leap(player, rank, skills);
-            case LUNGE -> lunge(player, rank, skills);
-            case HEAL -> heal(player, rank, skills);
-            case CLEANSE -> cleanse(player, rank, skills);
-            case WARCRY -> warcry(player, rank, skills);
-            case EXECUTION -> execution(player, rank, skills);
-            case CLEAVE -> cleave(player, rank, skills);
-            case OVERPOWER -> overpower(player, rank, skills);
-            case GUARD -> guard(player, rank, skills);
-            case BLAST -> blast(player, rank, skills);
-            case BLAZE -> blaze(player, rank, skills);
-            case GLACIER -> glacier(player, rank, skills);
-            case SMITE -> smite(player, rank, skills);
-            case SCAVENGER -> magnetism(player, rank, skills);
+            case DASH -> dash(player, rank, skills, abilityPower);
+            case LEAP -> leap(player, rank, skills, abilityPower);
+            case LUNGE -> lunge(player, rank, skills, abilityPower);
+            case HEAL -> heal(player, rank, skills, abilityPower);
+            case CLEANSE -> cleanse(player, rank, skills, abilityPower);
+            case WARCRY -> warcry(player, rank, skills, abilityPower);
+            case EXECUTION -> execution(player, rank, skills, abilityPower);
+            case CLEAVE -> cleave(player, rank, skills, abilityPower);
+            case OVERPOWER -> overpower(player, rank, skills, abilityPower);
+            case GUARD -> guard(player, rank, skills, abilityPower);
+            case BLAST -> blast(player, rank, skills, abilityPower);
+            case BLAZE -> blaze(player, rank, skills, abilityPower);
+            case GLACIER -> glacier(player, rank, skills, abilityPower);
+            case SMITE -> smite(player, rank, skills, abilityPower);
+            case SCAVENGER -> toxic(player, rank, skills, abilityPower);
         };
     }
 
-    private static boolean dash(ServerPlayer player, int rank, PlayerSkills skills) {
+    private static boolean dash(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
         Vec3 look = player.getLookAngle();
-        Vec3 horizontal = new Vec3(look.x, 0.0D, look.z).normalize().scale(AbilityScaling.dashDistance(rank, skills));
+        Vec3 horizontal = new Vec3(look.x, 0.0D, look.z).normalize().scale(AbilityScaling.dashDistance(rank, skills, abilityPower));
         player.push(horizontal.x, 0.08D, horizontal.z);
         player.hurtMarked = true;
         burst(player, ParticleTypes.CLOUD, 18, 0.38D, 0.12D, 0.38D, 0.02D);
@@ -83,18 +94,18 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean leap(ServerPlayer player, int rank, PlayerSkills skills) {
+    private static boolean leap(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
         Vec3 look = player.getLookAngle();
-        Vec3 launch = new Vec3(look.x, 0.0D, look.z).normalize().scale(AbilityScaling.leapForward(rank, skills));
-        player.setDeltaMovement(launch.x, AbilityScaling.leapVertical(rank, skills), launch.z);
+        Vec3 launch = new Vec3(look.x, 0.0D, look.z).normalize().scale(AbilityScaling.leapForward(rank, skills, abilityPower));
+        player.setDeltaMovement(launch.x, AbilityScaling.leapVertical(rank, skills, abilityPower), launch.z);
         player.hurtMarked = true;
         burst(player, ParticleTypes.POOF, 16, 0.25D, 0.05D, 0.25D, 0.02D);
         play(player, SoundEvents.GOAT_LONG_JUMP);
         return true;
     }
 
-    private static boolean lunge(ServerPlayer player, int rank, PlayerSkills skills) {
-        LivingEntity target = target(player, AbilityScaling.lungeDistance(rank, skills));
+    private static boolean lunge(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        LivingEntity target = target(player, AbilityScaling.lungeDistance(rank, skills, abilityPower));
         if (target == null) return false;
 
         Vec3 toward = target.position().subtract(player.position());
@@ -102,26 +113,26 @@ public final class AbilityLogic {
         if (horizontal.lengthSqr() < 1.0E-4D) {
             horizontal = new Vec3(player.getLookAngle().x, 0.0D, player.getLookAngle().z);
         }
-        Vec3 motion = horizontal.normalize().scale(AbilityScaling.lungeDistance(rank, skills) * 0.35D);
+        Vec3 motion = horizontal.normalize().scale(AbilityScaling.lungeDistance(rank, skills, abilityPower) * 0.35D);
         player.setDeltaMovement(motion.x, 0.18D, motion.z);
         player.hurtMarked = true;
         float speedBonus = AbilityScaling.lungeSpeedDamageBonus(new Vec3(motion.x, 0.0D, motion.z).length());
-        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.lungeDamage(rank, skills) + speedBonus));
-        knockbackFrom(player, target, AbilityScaling.lungeKnockback(rank, skills));
+        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.lungeDamage(rank, skills, abilityPower) + speedBonus));
+        knockbackFrom(player, target, AbilityScaling.lungeKnockback(rank, skills, abilityPower));
         line(player, ParticleTypes.SWEEP_ATTACK, player.position().add(0.0D, 1.0D, 0.0D), target.position().add(0.0D, 1.0D, 0.0D), 7);
         burst(player, ParticleTypes.CLOUD, 10, 0.2D, 0.1D, 0.2D, 0.01D);
         play(player, SoundEvents.PLAYER_ATTACK_KNOCKBACK);
         return true;
     }
 
-    private static boolean heal(ServerPlayer player, int rank, PlayerSkills skills) {
-        player.heal(AbilityScaling.healAmount(rank, skills));
+    private static boolean heal(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        player.heal(AbilityScaling.healAmount(rank, skills, abilityPower));
         ring(player, ParticleTypes.HEART, 10, 0.95D);
         play(player, SoundEvents.AMETHYST_BLOCK_CHIME);
         return true;
     }
 
-    private static boolean cleanse(ServerPlayer player, int rank, PlayerSkills skills) {
+    private static boolean cleanse(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
         boolean removed = false;
         for (MobEffectInstance effect : List.copyOf(player.getActiveEffects())) {
             if (!effect.getEffect().value().isBeneficial()) {
@@ -129,14 +140,14 @@ public final class AbilityLogic {
                 removed = true;
             }
         }
-        player.heal(AbilityScaling.cleanseHeal(rank, skills));
+        player.heal(AbilityScaling.cleanseHeal(rank, skills, abilityPower));
         burst(player, removed ? ParticleTypes.WAX_OFF : ParticleTypes.HAPPY_VILLAGER, 16, 0.35D, 0.35D, 0.35D, 0.01D);
         play(player, removed ? SoundEvents.GENERIC_DRINK : SoundEvents.AMETHYST_BLOCK_CHIME);
         return true;
     }
 
-    private static boolean guard(ServerPlayer player, int rank, PlayerSkills skills) {
-        int duration = AbilityScaling.guardDurationTicks(rank, skills);
+    private static boolean guard(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        int duration = AbilityScaling.guardDurationTicks(rank, skills, abilityPower);
         int amplifier = AbilityScaling.guardAmplifier(rank, skills);
         player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, duration, amplifier, false, true, true));
         if (rank >= 3) {
@@ -155,18 +166,18 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean warcry(ServerPlayer player, int rank, PlayerSkills skills) {
-        int duration = AbilityScaling.warcryDurationTicks(rank, skills);
+    private static boolean warcry(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        int duration = AbilityScaling.warcryDurationTicks(rank, skills, abilityPower);
         player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_BOOST, duration, AbilityScaling.warcryStrengthAmp(rank, skills), false, true, true));
         burst(player, ParticleTypes.ANGRY_VILLAGER, 8, 0.45D, 0.2D, 0.45D, 0.01D);
         play(player, SoundEvents.RAID_HORN.value());
         return true;
     }
 
-    private static boolean execution(ServerPlayer player, int rank, PlayerSkills skills) {
+    private static boolean execution(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
         LivingEntity target = target(player, 4.5D);
         if (target == null) return false;
-        float damage = AbilityScaling.executionDamage(rank, skills);
+        float damage = AbilityScaling.executionDamage(rank, skills, abilityPower);
         if (target.getHealth() <= target.getMaxHealth() * 0.35F) {
             damage *= AbilityScaling.executionMissingHealthBonus(rank);
         }
@@ -176,13 +187,13 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean cleave(ServerPlayer player, int rank, PlayerSkills skills) {
-        double radius = AbilityScaling.cleaveRadius(rank);
+    private static boolean cleave(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        double radius = AbilityScaling.cleaveRadius(rank, abilityPower);
         Vec3 facing = player.getLookAngle().normalize();
         List<LivingEntity> targets = player.level().getEntitiesOfClass(LivingEntity.class, player.getBoundingBox().inflate(radius),
                 entity -> entity != player && entity.isAlive() && isInFront(player, entity, facing));
         if (targets.isEmpty()) return false;
-        float damage = AbilityScaling.cleaveDamage(rank, skills);
+        float damage = AbilityScaling.cleaveDamage(rank, skills, abilityPower);
         for (LivingEntity target : targets) {
             target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
             knockbackFrom(player, target, 0.25D + rank * 0.05D);
@@ -192,19 +203,28 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean overpower(ServerPlayer player, int rank, PlayerSkills skills) {
+    private static boolean overpower(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
         LivingEntity target = target(player, 4.0D);
         if (target == null) return false;
-        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.overpowerDamage(rank, skills)));
-        knockbackFrom(player, target, AbilityScaling.overpowerKnockback(rank, skills));
+        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.overpowerDamage(rank, skills, abilityPower)));
+        knockbackFrom(player, target, AbilityScaling.overpowerKnockback(rank, skills, abilityPower));
+        List<LivingEntity> nearby = player.level().getEntitiesOfClass(
+                LivingEntity.class,
+                target.getBoundingBox().inflate(1.6D + rank * 0.12D),
+                entity -> entity != player && entity != target && entity.isAlive()
+        );
+        for (LivingEntity other : nearby) {
+            knockbackFrom(target, other, 0.3D + rank * 0.04D);
+        }
         target.setDeltaMovement(target.getDeltaMovement().add(0.0D, 0.16D + rank * 0.03D, 0.0D));
         burstAt(player, target.position().add(0.0D, 0.6D, 0.0D), ParticleTypes.CRIT, 14, 0.15D, 0.2D, 0.15D, 0.18D);
+        burstAt(player, target.position().add(0.0D, 0.25D, 0.0D), ParticleTypes.SWEEP_ATTACK, 6, 0.45D, 0.08D, 0.45D, 0.0D);
         play(player, SoundEvents.MACE_SMASH_GROUND_HEAVY);
         return true;
     }
 
-    private static boolean blast(ServerPlayer player, int rank, PlayerSkills skills) {
-        double radius = AbilityScaling.blastRadius(rank, skills);
+    private static boolean blast(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        double radius = AbilityScaling.blastRadius(rank, skills, abilityPower);
         List<LivingEntity> targets = player.level().getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
@@ -213,7 +233,7 @@ public final class AbilityLogic {
         if (targets.isEmpty()) return false;
 
         for (LivingEntity target : targets) {
-            target.hurt(player.damageSources().explosion(player, player), weaponScaledDamage(player, AbilityScaling.blastDamage(rank, skills)));
+            target.hurt(player.damageSources().explosion(player, player), weaponScaledDamage(player, AbilityScaling.blastDamage(rank, skills, abilityPower)));
             knockbackFrom(player, target, 0.35D + rank * 0.08D);
         }
 
@@ -225,8 +245,8 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean blaze(ServerPlayer player, int rank, PlayerSkills skills) {
-        double radius = AbilityScaling.blazeRadius(rank, skills);
+    private static boolean blaze(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        double radius = AbilityScaling.blazeRadius(rank, skills, abilityPower);
         List<LivingEntity> targets = player.level().getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
@@ -234,7 +254,7 @@ public final class AbilityLogic {
         );
         if (targets.isEmpty()) return false;
 
-        int fireSeconds = AbilityScaling.blazeBurnSeconds(rank);
+        int fireSeconds = AbilityScaling.blazeBurnSeconds(rank, abilityPower);
         boolean soulFire = rank >= AbilityId.BLAZE.maxRank();
         for (LivingEntity target : targets) {
             target.igniteForSeconds(fireSeconds);
@@ -249,7 +269,7 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean glacier(ServerPlayer player, int rank, PlayerSkills skills) {
+    private static boolean glacier(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
         LivingEntity target = target(player, 12.0D);
         if (target == null) return false;
 
@@ -264,16 +284,22 @@ public final class AbilityLogic {
         ).stream().sorted(Comparator.comparingDouble(entity -> entity.distanceToSqr(start))).toList();
 
         int remainingPierce = AbilityScaling.glacierPierce(rank);
-        float damage = AbilityScaling.glacierDamage(rank, skills);
+        float damage = AbilityScaling.glacierDamage(rank, skills, abilityPower);
         boolean hitAny = false;
+        Vec3 impactPos = end;
         for (LivingEntity hit : hits) {
             hit.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
             burstAt(player, hit.position().add(0.0D, 0.8D, 0.0D), ParticleTypes.SNOWFLAKE, 8, 0.12D, 0.18D, 0.12D, 0.01D);
+            impactPos = hit.getBoundingBox().getCenter();
             hitAny = true;
             remainingPierce--;
             if (remainingPierce <= 0) break;
         }
         if (!hitAny) return false;
+
+        if (rank >= AbilityId.GLACIER.maxRank()) {
+            shrapnelBurst(player, impactPos, damage * 0.6F, AbilityScaling.glacierPierce(rank));
+        }
 
         line(player, ParticleTypes.SNOWFLAKE, start, end, 18);
         line(player, ParticleTypes.ITEM_SNOWBALL, start, end, 10);
@@ -281,8 +307,8 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean smite(ServerPlayer player, int rank, PlayerSkills skills) {
-        double radius = AbilityScaling.smiteRadius(rank, skills);
+    private static boolean smite(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        double radius = AbilityScaling.smiteRadius(rank, skills, abilityPower);
         List<LivingEntity> targets = player.level().getEntitiesOfClass(
                 LivingEntity.class,
                 player.getBoundingBox().inflate(radius),
@@ -294,7 +320,7 @@ public final class AbilityLogic {
         if (targets.isEmpty()) return false;
 
         boolean blueLightning = rank >= AbilityId.SMITE.maxRank();
-        float damage = AbilityScaling.smiteDamage(rank, skills);
+        float damage = AbilityScaling.smiteDamage(rank, skills, abilityPower);
         for (LivingEntity target : targets) {
             spawnVisualLightning(player, target, blueLightning);
             target.hurt(player.damageSources().magic(), weaponScaledDamage(player, damage));
@@ -304,34 +330,31 @@ public final class AbilityLogic {
         return true;
     }
 
-    private static boolean magnetism(ServerPlayer player, int rank, PlayerSkills skills) {
-        PlayerAbilities abilities = player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-        abilities.setActiveTicks(AbilityId.SCAVENGER, AbilityScaling.magnetismDurationTicks(rank, skills));
-        ring(player, ParticleTypes.ENCHANT, 12, 1.0D);
-        play(player, SoundEvents.ITEM_PICKUP);
+    private static boolean toxic(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
+        double radius = AbilityScaling.toxicRadius(rank, skills, abilityPower);
+        List<LivingEntity> targets = player.level().getEntitiesOfClass(
+                LivingEntity.class,
+                player.getBoundingBox().inflate(radius),
+                entity -> entity != player && entity.isAlive() && entity instanceof Enemy
+        );
+        if (targets.isEmpty()) return false;
+
+        int poisonTicks = AbilityScaling.toxicPoisonTicks(rank, skills, abilityPower);
+        int amplifier = AbilityScaling.toxicAmplifier(rank);
+        float damage = AbilityScaling.toxicDamage(rank, skills, abilityPower);
+        for (LivingEntity target : targets) {
+            target.hurt(player.damageSources().magic(), weaponScaledDamage(player, damage));
+            target.addEffect(new MobEffectInstance(MobEffects.POISON, poisonTicks, amplifier, false, true, true));
+            burstAt(player, target.position().add(0.0D, 0.8D, 0.0D), ParticleTypes.WITCH, 8, 0.18D, 0.25D, 0.18D, 0.01D);
+        }
+
+        ring(player, ParticleTypes.WITCH, 18, radius);
+        ring(player, ParticleTypes.ITEM_SLIME, 14, Math.max(0.8D, radius * 0.8D));
+        play(player, SoundEvents.WITCH_THROW);
         return true;
     }
 
     public static void tickActive(ServerPlayer player, PlayerAbilities abilities, PlayerSkills skills) {
-        int active = abilities.activeTicks(AbilityId.SCAVENGER);
-        if (active <= 0) return;
-
-        int next = active - 1;
-        abilities.setActiveTicks(AbilityId.SCAVENGER, next);
-        if (next <= 0) return;
-
-        double radius = AbilityScaling.magnetismRadius(Math.max(1, abilities.rank(AbilityId.SCAVENGER)), skills);
-        List<ItemEntity> items = player.level().getEntitiesOfClass(ItemEntity.class, player.getBoundingBox().inflate(radius), Entity::isAlive);
-        for (ItemEntity item : items) {
-            Vec3 toward = player.position().add(0.0D, 0.35D, 0.0D).subtract(item.position());
-            if (toward.lengthSqr() > 1.0E-4D) {
-                item.setDeltaMovement(toward.normalize().scale(0.45D));
-                item.hasImpulse = true;
-            }
-        }
-        if (next % 10 == 0) {
-            ring(player, ParticleTypes.ENCHANT, 8, Math.max(0.7D, radius * 0.4D));
-        }
     }
 
     private static LivingEntity target(ServerPlayer player, double range) {
@@ -349,10 +372,10 @@ public final class AbilityLogic {
         return facing.dot(toTarget) > 0.15D;
     }
 
-    private static void knockbackFrom(Player player, LivingEntity target, double strength) {
-        Vec3 dir = target.position().subtract(player.position());
+    private static void knockbackFrom(LivingEntity source, LivingEntity target, double strength) {
+        Vec3 dir = target.position().subtract(source.position());
         Vec3 horizontal = new Vec3(dir.x, 0.0D, dir.z);
-        if (horizontal.lengthSqr() < 1.0E-4D) horizontal = player.getLookAngle();
+        if (horizontal.lengthSqr() < 1.0E-4D) horizontal = source.getLookAngle();
         horizontal = horizontal.normalize().scale(strength);
         target.push(horizontal.x, 0.1D, horizontal.z);
         target.hurtMarked = true;
@@ -410,6 +433,27 @@ public final class AbilityLogic {
             Vec3 pos = start.add(delta.scale(progress));
             level.sendParticles(particle, pos.x, pos.y, pos.z, 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
+    }
+
+    private static void shrapnelBurst(ServerPlayer player, Vec3 impactPos, float damage, int pierceBudget) {
+        List<LivingEntity> shards = player.level().getEntitiesOfClass(
+                LivingEntity.class,
+                new AABB(impactPos, impactPos).inflate(3.2D),
+                entity -> entity != player && entity.isAlive()
+        ).stream()
+                .sorted(Comparator.comparingDouble(entity -> entity.distanceToSqr(impactPos.x, impactPos.y, impactPos.z)))
+                .limit(Math.max(2, pierceBudget))
+                .toList();
+
+        for (LivingEntity shardTarget : shards) {
+            Vec3 targetPos = shardTarget.getBoundingBox().getCenter();
+            shardTarget.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
+            line(player, ParticleTypes.SNOWFLAKE, impactPos, targetPos, 6);
+            line(player, ParticleTypes.ITEM_SNOWBALL, impactPos, targetPos, 4);
+            burstAt(player, targetPos, ParticleTypes.SNOWFLAKE, 5, 0.12D, 0.12D, 0.12D, 0.01D);
+        }
+
+        burstAt(player, impactPos, ParticleTypes.ITEM_SNOWBALL, 12, 0.35D, 0.18D, 0.35D, 0.05D);
     }
 
     private static double distanceToLine(Vec3 point, Vec3 lineStart, Vec3 lineEnd) {

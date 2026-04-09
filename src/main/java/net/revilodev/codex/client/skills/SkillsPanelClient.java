@@ -10,8 +10,6 @@ import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.bus.api.EventPriority;
@@ -86,6 +84,7 @@ public final class SkillsPanelClient {
             st.abilityList.setSelected(def == null ? null : def.id());
         });
         st.abilityList.setHeaderVisible(false);
+        st.abilityList.setShowLocked(false);
         st.abilityDetails = new AbilityDetailsPanel(0, 0, AbilityListWidget.gridWidth(), PANEL_H / 3);
         st.skillsTab = new PanelTabButton(0, 0, PanelTab.SKILLS, () -> setTab(st, PanelTab.SKILLS));
         st.abilitiesTab = new PanelTabButton(0, 0, PanelTab.ABILITIES, () -> setTab(st, PanelTab.ABILITIES));
@@ -322,7 +321,7 @@ public final class SkillsPanelClient {
         int detailsH = PANEL_H / 3 + 10;
         int detailsW = Math.max(20, (innerRight - innerLeft) - 5);
         int detailsX = innerLeft + 2;
-        int detailsY = innerBottom - detailsH;
+        int detailsY = innerBottom - detailsH - 5;
 
         st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
         st.skillsList.setBounds(listX, listY, listW, SkillListWidget.preferredHeight());
@@ -403,21 +402,10 @@ public final class SkillsPanelClient {
                 ? mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get()).points()
                 : mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get()).points();
 
-        String text = Integer.toString(points);
-        int x = inv.getGuiLeft() + 32;
-        int y = inv.getGuiTop() + 25;
-        int textColor = 0xD88CFF;
-        float pulse = 0.55F + 0.45F * (float) Math.sin((System.currentTimeMillis() % 1600L) / 1600.0D * Math.PI * 2.0D);
-        int glowOuter = ((int) (50 + 45 * pulse) << 24) | 0xA86CFF;
-        int glowInner = ((int) (85 + 65 * pulse) << 24) | 0xE0BEFF;
-
-        gg.fill(x - 4, y - 4, x + 12, y + 12, glowOuter);
-        gg.fill(x - 2, y - 2, x + 10, y + 10, glowInner);
-        gg.fill(x - 1, y - 1, x + 9, y + 9, 0xB02B173D);
-        gg.renderItem(new ItemStack(Items.GOLD_NUGGET), x, y);
-
-        gg.drawString(mc.font, text, x + 14, y + 1, textColor, false);
-        gg.drawString(mc.font, text, x + 13, y, 0x66F2D9FF, false);
+        String label = "Points: " + points;
+        int x = st.bg.getX() + PANEL_W - mc.font.width(label) - 8;
+        int y = st.bg.getY() + 8;
+        gg.drawString(mc.font, label, x, y, 0xFFFFFF, true);
     }
 
     private static boolean isInsideOverlay(State st, double mouseX, double mouseY) {
