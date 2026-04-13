@@ -1,5 +1,6 @@
 package net.revilodev.codex.client.abilities;
 
+import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractButton;
@@ -20,6 +21,9 @@ import net.revilodev.codex.abilities.PlayerAbilities;
 import net.revilodev.codex.abilities.logic.AbilityScaling;
 import net.revilodev.codex.skills.PlayerSkills;
 import net.revilodev.codex.skills.SkillsAttachments;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @OnlyIn(Dist.CLIENT)
 public final class AbilityDetailsPanel extends AbstractWidget {
@@ -48,6 +52,10 @@ public final class AbilityDetailsPanel extends AbstractWidget {
     private AbilityDefinition ability;
     private float scrollY;
     private int contentHeight;
+    private int keybindLeft;
+    private int keybindTop;
+    private int keybindRight;
+    private int keybindBottom;
 
     public AbilityDetailsPanel(int x, int y, int w, int h) {
         super(x, y, w, h, Component.empty());
@@ -102,13 +110,32 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
         PlayerSkills skills = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
         int level = abilities.rank(ability.id());
-        boolean canUp = level < ability.maxRank() && abilities.points() > 0;
-        boolean canDown = level > 0;
+        boolean canUp = abilities.canUpgrade(ability.id());
+        boolean canDown = abilities.canDowngrade(ability.id());
 
         gg.blit(ability.iconTexture(), x + 3, y + 4, 0, 0, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE);
         drawScaledText(gg, ability.title(), x + 17, y + 5, 0xFFFFFF, HEADER_TEXT_SCALE);
         drawScaledText(gg, "level: " + level + "/" + ability.maxRank(), x + 17, y + 11, 0xD0D0D0, HEADER_TEXT_SCALE);
-        drawRightScaledText(gg, "Keybind: " + bindLabel(ability.id()), x + w - 4, y + 5, 0xD0D0D0, 0.62F);
+
+        List<AbilityId> abilityConflicts = AbilityKeybinds.conflictingAbilities(ability.id());
+        List<KeyMapping> keyConflicts = AbilityKeybinds.conflictingNonAbilityMappings(ability.id());
+        String keyText = "Keybind: " + bindLabel(ability.id());
+
+        float keyScale = 0.62F;
+        int keyWidth = Mth.ceil(mc.font.width(keyText) * keyScale);
+        int keyX = x + w - 4 - keyWidth;
+        int keyY = y + 5;
+        keybindLeft = keyX;
+        keybindTop = keyY;
+        keybindRight = keyX + keyWidth;
+        keybindBottom = keyY + Mth.ceil(mc.font.lineHeight * keyScale);
+        boolean keyHovered = isOverKeybind(mouseX, mouseY);
+
+        int keyColor = 0xD0D0D0;
+        if (!abilityConflicts.isEmpty()) keyColor = 0xFF6A6A;
+        else if (!keyConflicts.isEmpty()) keyColor = 0xF0D15C;
+        else if (keyHovered) keyColor = 0xFFFFFF;
+        drawScaledText(gg, keyText, keyX, keyY, keyColor, keyScale);
 
         int viewportTop = y + CONTENT_TOP;
         int viewportBottom = y + height - CONTENT_BOTTOM_PADDING;
@@ -123,6 +150,10 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         textY = drawSmallWrapped(gg, "Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), Math.max(1, level), skills)), x + 4, textY, w - 8, 0xA6D9FF) + 3;
         drawSmallWrapped(gg, "Scaling: " + AbilityScaling.summary(ability.id(), Math.max(1, level), skills), x + 4, textY, w - 8, 0xA6D9FF);
         gg.disableScissor();
+
+        if (keyHovered) {
+            drawKeybindTooltip(gg, mouseX, mouseY, abilityConflicts, keyConflicts);
+        }
 
         upgrade.active = canUp;
         downgrade.active = canDown;
@@ -187,17 +218,28 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         gg.pose().popPose();
     }
 
-    private void drawRightScaledText(GuiGraphics gg, String text, int rightX, int y, int color, float scale) {
-        int scaledWidth = Mth.ceil(mc.font.width(text) * scale);
-        drawScaledText(gg, text, rightX - scaledWidth, y, color, scale);
-    }
-
     private static String formatSeconds(int ticks) {
         return String.format(java.util.Locale.ROOT, "%.1fs", ticks / 20.0D);
     }
 
     private static String bindLabel(AbilityId id) {
         return AbilityKeybinds.keyName(id);
+    }
+
+    private boolean isOverKeybind(double mouseX, double mouseY) {
+        return mouseX >= keybindLeft && mouseX <= keybindRight && mouseY >= keybindTop && mouseY <= keybindBottom;
+    }
+
+    private void drawKeybindTooltip(GuiGraphics gg, int mouseX, int mouseY, List<AbilityId> abilityConflicts, List<KeyMapping> keyConflicts) {
+        List<Component> lines = new ArrayList<>();
+        for (AbilityId id : abilityConflicts) {
+            lines.add(Component.literal("Conflicts with ability: " + id.title()));
+        }
+        for (KeyMapping mapping : keyConflicts) {
+            lines.add(Component.literal("Conflicts with: " + Component.translatable(mapping.getName()).getString()));
+        }
+        if (lines.isEmpty()) return;
+        gg.renderTooltip(mc.font, lines, java.util.Optional.empty(), mouseX, mouseY);
     }
 
     private final class UpgradeButton extends AbstractButton {

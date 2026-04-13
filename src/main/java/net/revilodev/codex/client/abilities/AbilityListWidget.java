@@ -42,6 +42,7 @@ public final class AbilityListWidget extends AbstractWidget {
     private AbilityId selected;
     private boolean headerVisible = true;
     private boolean showLocked = true;
+    private LineArea hoveredLine;
 
     public AbilityListWidget(int x, int y, int w, int h, Consumer<AbilityDefinition> onClick) {
         super(x, y, w, h, Component.empty());
@@ -108,11 +109,22 @@ public final class AbilityListWidget extends AbstractWidget {
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible || mc.player == null) return;
         PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+        hoveredLine = null;
         if (!showLocked) {
             reloadAbilities();
         }
         if (headerVisible) {
             drawScaledText(gg, "Ability Points: " + abilities.points(), getX() + 1, getY() + 4, 0xC78CFF, 0.85F);
+        }
+
+        if (selected == AbilityId.BLAZE || selected == AbilityId.SCAVENGER) {
+            drawIncompatibilityLine(gg, mouseX, mouseY, AbilityId.SCAVENGER, AbilityId.BLAZE);
+        }
+        if (selected == AbilityId.EXECUTION || selected == AbilityId.OVERPOWER) {
+            drawIncompatibilityLine(gg, mouseX, mouseY, AbilityId.EXECUTION, AbilityId.OVERPOWER);
+        }
+        if (selected == AbilityId.LUNGE) {
+            drawRequiredLine(gg, mouseX, mouseY);
         }
 
         int top = getY() + HEADER_HEIGHT;
@@ -133,6 +145,10 @@ public final class AbilityListWidget extends AbstractWidget {
             }
             drawScaledTile(gg, tex, x, y, CELL_SIZE, CELL_SIZE);
             gg.blit(def.iconTexture(), x + 3, y + 3, 0, 0, 16, 16, 16, 16);
+        }
+
+        if (hoveredLine != null) {
+            gg.renderTooltip(mc.font, Component.literal(hoveredLine.tooltip()), mouseX, mouseY);
         }
     }
 
@@ -165,6 +181,67 @@ public final class AbilityListWidget extends AbstractWidget {
         return null;
     }
 
+    private Node nodeFor(AbilityId id) {
+        if (id == null) return null;
+        for (Node node : nodes) {
+            if (node.def.id() == id) return node;
+        }
+        return null;
+    }
+
+    private void drawIncompatibilityLine(GuiGraphics gg, int mouseX, int mouseY, AbilityId leftId, AbilityId rightId) {
+        Node toxic = nodeFor(leftId);
+        Node blaze = nodeFor(rightId);
+        if (toxic == null || blaze == null) return;
+
+        int top = getY() + HEADER_HEIGHT;
+        int toxicX = getX() + toxic.col * (CELL_SIZE + GAP);
+        int toxicY = top + toxic.row * (CELL_SIZE + GAP);
+        int blazeX = getX() + blaze.col * (CELL_SIZE + GAP);
+        int blazeY = top + blaze.row * (CELL_SIZE + GAP);
+        int y = Math.max(toxicY, blazeY) + CELL_SIZE + 1 - 13;
+        drawBetweenNodesMarker(gg, toxicX, blazeX, y, 0xFFE05353, mouseX, mouseY, "incompatible");
+    }
+
+    private void drawRequiredLine(GuiGraphics gg, int mouseX, int mouseY) {
+        Node leap = nodeFor(AbilityId.LEAP);
+        Node lunge = nodeFor(AbilityId.LUNGE);
+        if (leap == null || lunge == null) return;
+
+        int top = getY() + HEADER_HEIGHT;
+        int leapX = getX() + leap.col * (CELL_SIZE + GAP);
+        int leapY = top + leap.row * (CELL_SIZE + GAP);
+        int lungeX = getX() + lunge.col * (CELL_SIZE + GAP);
+        int lungeY = top + lunge.row * (CELL_SIZE + GAP);
+        int y = Math.max(leapY, lungeY) + CELL_SIZE + 1 - 14;
+        drawBetweenNodesMarker(gg, leapX + 15, lungeX + 15, y, 0xFF4BE36A, mouseX, mouseY, "Required dependency");
+    }
+
+    private void drawBetweenNodesMarker(GuiGraphics gg, int leftNodeX, int rightNodeX, int y, int color, int mouseX, int mouseY, String tooltip) {
+        int c1 = leftNodeX + (CELL_SIZE / 2);
+        int c2 = rightNodeX + (CELL_SIZE / 2);
+        int midpoint = (c1 + c2) / 2;
+        int x1 = midpoint - 7;
+        int x2 = x1 + 14;
+        drawOutlinedBar(gg, x1, x2, y, color);
+        updateHoveredLine(mouseX, mouseY, x1, x2, y, tooltip);
+    }
+
+    private void drawOutlinedBar(GuiGraphics gg, int x1, int x2, int y, int color) {
+        gg.hLine(x1 - 1, x2 + 1, y - 1, 0xFF000000);
+        gg.hLine(x1 - 1, x2 + 1, y + 2, 0xFF000000);
+        gg.vLine(x1 - 1, y - 1, y + 2, 0xFF000000);
+        gg.vLine(x2 + 1, y - 1, y + 2, 0xFF000000);
+        gg.hLine(x1, x2, y, color);
+        gg.hLine(x1, x2, y + 1, color);
+    }
+
+    private void updateHoveredLine(int mouseX, int mouseY, int x1, int x2, int y, String tooltip) {
+        if (mouseX >= x1 - 1 && mouseX <= x2 + 1 && mouseY >= y - 1 && mouseY <= y + 2) {
+            hoveredLine = new LineArea(tooltip);
+        }
+    }
+
     private void drawScaledTile(GuiGraphics gg, ResourceLocation tex, int x, int y, int w, int h) {
         gg.pose().pushPose();
         gg.pose().translate(x, y, 0.0F);
@@ -182,4 +259,5 @@ public final class AbilityListWidget extends AbstractWidget {
     }
 
     private record Node(AbilityDefinition def, int col, int row) {}
+    private record LineArea(String tooltip) {}
 }

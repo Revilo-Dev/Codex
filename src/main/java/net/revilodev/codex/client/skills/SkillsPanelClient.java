@@ -84,7 +84,7 @@ public final class SkillsPanelClient {
             st.abilityList.setSelected(def == null ? null : def.id());
         });
         st.abilityList.setHeaderVisible(false);
-        st.abilityList.setShowLocked(false);
+        st.abilityList.setShowLocked(true);
         st.abilityDetails = new AbilityDetailsPanel(0, 0, AbilityListWidget.gridWidth(), PANEL_H / 3);
         st.skillsTab = new PanelTabButton(0, 0, PanelTab.SKILLS, () -> setTab(st, PanelTab.SKILLS));
         st.abilitiesTab = new PanelTabButton(0, 0, PanelTab.ABILITIES, () -> setTab(st, PanelTab.ABILITIES));
@@ -148,8 +148,8 @@ public final class SkillsPanelClient {
             st.abilityDetails.upgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
             st.abilityDetails.downgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
         }
-        event.getGuiGraphics().pose().popPose();
         renderPointsBadge(event.getGuiGraphics(), st, inv);
+        event.getGuiGraphics().pose().popPose();
     }
 
     public static void onMouseScrolled(ScreenEvent.MouseScrolled.Pre event) {
@@ -172,7 +172,8 @@ public final class SkillsPanelClient {
 
     public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre event) {
         State st = STATES.get(event.getScreen());
-        if (st == null || !st.open || event.getButton() != 0) return;
+        if (st == null || !st.open) return;
+        if (event.getButton() != 0) return;
 
         double mouseX = event.getMouseX();
         double mouseY = event.getMouseY();
@@ -398,14 +399,21 @@ public final class SkillsPanelClient {
         var mc = net.minecraft.client.Minecraft.getInstance();
         if (mc.player == null) return;
 
-        int points = st.activeTab == PanelTab.ABILITIES
+        boolean abilitiesTab = st.activeTab == PanelTab.ABILITIES;
+        int points = abilitiesTab
                 ? mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get()).points()
                 : mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get()).points();
 
-        String label = "Points: " + points;
-        int x = st.bg.getX() + PANEL_W - mc.font.width(label) - 8;
-        int y = st.bg.getY() + 8;
-        gg.drawString(mc.font, label, x, y, 0xFFFFFF, true);
+        String label = abilitiesTab ? "Ability Points: " + points : "Points: " + points;
+        float scale = 0.85F;
+        int x = (abilitiesTab ? st.abilityList.getX() : st.skillsList.getX()) + 1;
+        int y = (abilitiesTab ? st.abilityList.getY() : st.skillsList.getY()) + 4;
+        int color = abilitiesTab ? 0xC78CFF : 0x6AB2FF;
+        gg.pose().pushPose();
+        gg.pose().translate(x, y, 0.0F);
+        gg.pose().scale(scale, scale, 1.0F);
+        gg.drawString(mc.font, label, 0, 0, color, false);
+        gg.pose().popPose();
     }
 
     private static boolean isInsideOverlay(State st, double mouseX, double mouseY) {

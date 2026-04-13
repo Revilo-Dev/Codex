@@ -23,6 +23,7 @@ import net.revilodev.codex.abilities.PlayerAbilities;
 import net.revilodev.codex.abilities.logic.AbilityScaling;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Map;
 
@@ -30,7 +31,6 @@ import java.util.Map;
 public final class AbilityKeybinds {
     private static final String CATEGORY = "key.categories.codex";
     private static final Map<AbilityId, KeyMapping> KEYS = new EnumMap<>(AbilityId.class);
-    private static final List<AbilityId> ALT_GRID = AbilityRegistry.all().stream().map(def -> def.id()).toList();
     private static boolean altWasDown = false;
     private static int altSelectionIndex = 0;
     private static boolean altSelectionChanged = false;
@@ -49,9 +49,58 @@ public final class AbilityKeybinds {
         return key != null ? key.getTranslatedKeyMessage().getString() : "Unbound";
     }
 
+    public static KeyMapping mapping(AbilityId id) {
+        return KEYS.get(id);
+    }
+
+    public static void rebind(AbilityId id, InputConstants.Key key) {
+        KeyMapping mapping = KEYS.get(id);
+        if (mapping == null || key == null) return;
+        mapping.setKey(key);
+        KeyMapping.resetMapping();
+        Minecraft mc = Minecraft.getInstance();
+        if (mc != null) {
+            mc.options.save();
+        }
+    }
+
+    public static List<AbilityId> conflictingAbilities(AbilityId id) {
+        KeyMapping base = KEYS.get(id);
+        if (base == null) return List.of();
+        InputConstants.Key key = base.getKey();
+        if (key == null || key.equals(InputConstants.UNKNOWN)) return List.of();
+
+        List<AbilityId> out = new ArrayList<>();
+        for (var entry : KEYS.entrySet()) {
+            if (entry.getKey() == id) continue;
+            KeyMapping other = entry.getValue();
+            if (other != null && key.equals(other.getKey())) out.add(entry.getKey());
+        }
+        return List.copyOf(out);
+    }
+
+    public static List<KeyMapping> conflictingNonAbilityMappings(AbilityId id) {
+        Minecraft mc = Minecraft.getInstance();
+        KeyMapping base = KEYS.get(id);
+        if (mc == null || base == null) return List.of();
+        InputConstants.Key key = base.getKey();
+        if (key == null || key.equals(InputConstants.UNKNOWN)) return List.of();
+
+        List<KeyMapping> out = new ArrayList<>();
+        for (KeyMapping mapping : mc.options.keyMappings) {
+            if (mapping == null || mapping == base || KEYS.containsValue(mapping)) continue;
+            if (key.equals(mapping.getKey())) out.add(mapping);
+        }
+        return List.copyOf(out);
+    }
+
     public static AbilityId altSelection() {
-        if (ALT_GRID.isEmpty()) return null;
-        return ALT_GRID.get(Mth.clamp(altSelectionIndex, 0, ALT_GRID.size() - 1));
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null) return null;
+        PlayerAbilities data = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+        List<AbilityId> grid = altGrid(data);
+        if (grid.isEmpty()) return null;
+        return grid.get(Mth.clamp(altSelectionIndex, 0, grid.size() - 1));
     }
 
     private static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
@@ -64,6 +113,12 @@ public final class AbilityKeybinds {
 
         PlayerAbilities data = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
         data.tickCooldowns();
+        List<AbilityId> grid = altGrid(data);
+        if (!grid.isEmpty()) {
+            altSelectionIndex = Mth.clamp(altSelectionIndex, 0, grid.size() - 1);
+        } else {
+            altSelectionIndex = 0;
+        }
 
         boolean altDown = Screen.hasAltDown();
         if (altDown && !altWasDown) {
@@ -84,12 +139,21 @@ public final class AbilityKeybinds {
     }
 
     private static void onMouseScroll(InputEvent.MouseScrollingEvent event) {
-        if (!Screen.hasAltDown() || ALT_GRID.isEmpty()) return;
+        Minecraft mc = Minecraft.getInstance();
+        if (!Screen.hasAltDown() || mc.player == null) return;
+        PlayerAbilities data = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+        List<AbilityId> grid = altGrid(data);
+        if (grid.isEmpty()) return;
         double delta = event.getScrollDeltaY();
         if (delta == 0.0D) return;
-        altSelectionIndex = Math.floorMod(altSelectionIndex - (delta > 0.0D ? 1 : -1), ALT_GRID.size());
+        altSelectionIndex = Math.floorMod(altSelectionIndex - (delta > 0.0D ? 1 : -1), grid.size());
         altSelectionChanged = true;
         event.setCanceled(true);
+    }
+
+    private static List<AbilityId> altGrid(PlayerAbilities data) {
+        if (data == null) return List.of();
+        return AbilityRegistry.all().stream().map(def -> def.id()).filter(data::unlocked).toList();
     }
 
     private static void createMappings() {
@@ -133,7 +197,7 @@ public final class AbilityKeybinds {
         }
         if (mc.player == null) return AbilityUseFail.NO_TARGET;
         return switch (id) {
-            case LUNGE -> hasTarget(mc, AbilityScaling.lungeDistance(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
+            case LUNGE -> hasTarget(mc, AbilityScaling.lungeDistance(Math.max(1, data.rank(id)), Math.max(0, data.rank(AbilityId.DASH)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
             case EXECUTION -> hasTarget(mc, 4.5D) ? null : AbilityUseFail.NO_TARGET;
             case OVERPOWER -> hasTarget(mc, 4.0D) ? null : AbilityUseFail.NO_TARGET;
             case GLACIER -> hasTarget(mc, 12.0D) ? null : AbilityUseFail.NO_TARGET;

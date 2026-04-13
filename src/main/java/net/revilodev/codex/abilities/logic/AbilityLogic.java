@@ -7,7 +7,6 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
-import net.minecraft.util.Mth;
 import net.minecraft.world.effect.MobEffectInstance;
 import net.minecraft.world.effect.MobEffects;
 import net.minecraft.world.entity.Entity;
@@ -105,7 +104,9 @@ public final class AbilityLogic {
     }
 
     private static boolean lunge(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
-        LivingEntity target = target(player, AbilityScaling.lungeDistance(rank, skills, abilityPower));
+        PlayerAbilities abilities = player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+        int dashRank = Math.max(0, abilities.rank(AbilityId.DASH));
+        LivingEntity target = target(player, AbilityScaling.lungeDistance(rank, dashRank, skills, abilityPower));
         if (target == null) return false;
 
         Vec3 toward = target.position().subtract(player.position());
@@ -113,12 +114,12 @@ public final class AbilityLogic {
         if (horizontal.lengthSqr() < 1.0E-4D) {
             horizontal = new Vec3(player.getLookAngle().x, 0.0D, player.getLookAngle().z);
         }
-        Vec3 motion = horizontal.normalize().scale(AbilityScaling.lungeDistance(rank, skills, abilityPower) * 0.35D);
+        Vec3 motion = horizontal.normalize().scale(AbilityScaling.lungeDistance(rank, dashRank, skills, abilityPower) * 0.35D);
         player.setDeltaMovement(motion.x, 0.18D, motion.z);
         player.hurtMarked = true;
         float speedBonus = AbilityScaling.lungeSpeedDamageBonus(new Vec3(motion.x, 0.0D, motion.z).length());
-        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.lungeDamage(rank, skills, abilityPower) + speedBonus));
-        knockbackFrom(player, target, AbilityScaling.lungeKnockback(rank, skills, abilityPower));
+        target.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, AbilityScaling.lungeDamage(rank, dashRank, skills, abilityPower) + speedBonus));
+        knockbackFrom(player, target, AbilityScaling.lungeKnockback(rank, dashRank, skills, abilityPower));
         line(player, ParticleTypes.SWEEP_ATTACK, player.position().add(0.0D, 1.0D, 0.0D), target.position().add(0.0D, 1.0D, 0.0D), 7);
         burst(player, ParticleTypes.CLOUD, 10, 0.2D, 0.1D, 0.2D, 0.01D);
         play(player, SoundEvents.PLAYER_ATTACK_KNOCKBACK);
@@ -139,6 +140,10 @@ public final class AbilityLogic {
                 player.removeEffect(effect.getEffect());
                 removed = true;
             }
+        }
+        if (player.isOnFire()) {
+            player.clearFire();
+            removed = true;
         }
         player.heal(AbilityScaling.cleanseHeal(rank, skills, abilityPower));
         burst(player, removed ? ParticleTypes.WAX_OFF : ParticleTypes.HAPPY_VILLAGER, 16, 0.35D, 0.35D, 0.35D, 0.01D);
@@ -270,39 +275,41 @@ public final class AbilityLogic {
     }
 
     private static boolean glacier(ServerPlayer player, int rank, PlayerSkills skills, double abilityPower) {
-        LivingEntity target = target(player, 12.0D);
-        if (target == null) return false;
+        LivingEntity primaryTarget = target(player, 12.0D);
+        if (primaryTarget == null) return false;
 
-        Vec3 start = player.getEyePosition().add(player.getLookAngle().scale(0.4D));
-        Vec3 end = target.getBoundingBox().getCenter();
-        if (end.subtract(start).lengthSqr() < 1.0E-4D) return false;
-
-        List<LivingEntity> hits = player.level().getEntitiesOfClass(
+        List<LivingEntity> projectiles = player.level().getEntitiesOfClass(
                 LivingEntity.class,
-                new AABB(start, end).inflate(1.5D),
-                entity -> entity != player && entity.isAlive() && distanceToLine(entity.getBoundingBox().getCenter(), start, end) <= 1.1D
-        ).stream().sorted(Comparator.comparingDouble(entity -> entity.distanceToSqr(start))).toList();
-
-        int remainingPierce = AbilityScaling.glacierPierce(rank);
-        float damage = AbilityScaling.glacierDamage(rank, skills, abilityPower);
-        boolean hitAny = false;
-        Vec3 impactPos = end;
-        for (LivingEntity hit : hits) {
-            hit.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
-            burstAt(player, hit.position().add(0.0D, 0.8D, 0.0D), ParticleTypes.SNOWFLAKE, 8, 0.12D, 0.18D, 0.12D, 0.01D);
-            impactPos = hit.getBoundingBox().getCenter();
-            hitAny = true;
-            remainingPierce--;
-            if (remainingPierce <= 0) break;
+                player.getBoundingBox().inflate(12.0D),
+                entity -> entity != player && entity.isAlive()
+        ).stream()
+                .sorted(Comparator.comparingDouble(entity -> entity.distanceToSqr(player)))
+                .toList();
+        java.util.ArrayList<LivingEntity> targets = new java.util.ArrayList<>();
+        targets.add(primaryTarget);
+        for (LivingEntity candidate : projectiles) {
+            if (targets.size() >= AbilityScaling.glacierProjectiles(rank)) break;
+            if (candidate == primaryTarget || targets.contains(candidate)) continue;
+            targets.add(candidate);
         }
-        if (!hitAny) return false;
+
+        float damage = AbilityScaling.glacierDamage(rank, skills, abilityPower);
+        Vec3 start = player.getEyePosition().add(player.getLookAngle().scale(0.4D));
+        Vec3 impactPos = primaryTarget.getBoundingBox().getCenter();
+        for (LivingEntity hit : targets) {
+            Vec3 end = hit.getBoundingBox().getCenter();
+            if (end.subtract(start).lengthSqr() < 1.0E-4D) continue;
+            hit.hurt(player.damageSources().playerAttack(player), weaponScaledDamage(player, damage));
+            line(player, ParticleTypes.SNOWFLAKE, start, end, 18);
+            line(player, ParticleTypes.ITEM_SNOWBALL, start, end, 10);
+            burstAt(player, hit.position().add(0.0D, 0.8D, 0.0D), ParticleTypes.SNOWFLAKE, 8, 0.12D, 0.18D, 0.12D, 0.01D);
+            impactPos = end;
+        }
 
         if (rank >= AbilityId.GLACIER.maxRank()) {
-            shrapnelBurst(player, impactPos, damage * 0.6F, AbilityScaling.glacierPierce(rank));
+            shrapnelBurst(player, impactPos, damage * 0.6F, AbilityScaling.glacierProjectiles(rank));
         }
 
-        line(player, ParticleTypes.SNOWFLAKE, start, end, 18);
-        line(player, ParticleTypes.ITEM_SNOWBALL, start, end, 10);
         play(player, SoundEvents.GLASS_BREAK);
         return true;
     }
@@ -454,17 +461,6 @@ public final class AbilityLogic {
         }
 
         burstAt(player, impactPos, ParticleTypes.ITEM_SNOWBALL, 12, 0.35D, 0.18D, 0.35D, 0.05D);
-    }
-
-    private static double distanceToLine(Vec3 point, Vec3 lineStart, Vec3 lineEnd) {
-        Vec3 line = lineEnd.subtract(lineStart);
-        double lengthSqr = line.lengthSqr();
-        if (lengthSqr < 1.0E-4D) {
-            return point.distanceTo(lineStart);
-        }
-        double t = Mth.clamp(point.subtract(lineStart).dot(line) / lengthSqr, 0.0D, 1.0D);
-        Vec3 projected = lineStart.add(line.scale(t));
-        return point.distanceTo(projected);
     }
 
     private static void spawnVisualLightning(ServerPlayer player, LivingEntity target, boolean blueLightning) {

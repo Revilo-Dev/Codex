@@ -4,20 +4,20 @@ import net.minecraft.resources.ResourceLocation;
 import net.revilodev.codex.skills.SkillId;
 
 public enum AbilityId {
-    DASH("Dash", "Dash forward with momentum.", ResourceLocation.parse("minecraft:feather"), SkillId.AGILITY, 5, 120),
-    LEAP("Leap", "Leap up a few blocks.", ResourceLocation.parse("minecraft:rabbit_foot"), SkillId.AGILITY, 5, 160),
-    LUNGE("Lunge", "Dash Into the target, slam into it, and knock it away.", ResourceLocation.parse("minecraft:wind_charge"), SkillId.AGILITY, 5, 130),
+    DASH("Dash", "Dash forward with momentum.", ResourceLocation.parse("minecraft:feather"), SkillId.AGILITY, 3, 120),
+    LEAP("Leap", "Leap up a few blocks.", ResourceLocation.parse("minecraft:rabbit_foot"), SkillId.AGILITY, 3, 160),
+    LUNGE("Lunge", "Dash Into the target, slam into it, and knock it away.", ResourceLocation.parse("minecraft:wind_charge"), SkillId.AGILITY, 3, 130),
     HEAL("Heal", "Restore health instantly.", ResourceLocation.parse("minecraft:golden_apple"), SkillId.VITALITY, 5, 220),
-    CLEANSE("Cleanse", "Cleanse negative effects and recover slightly.", ResourceLocation.parse("minecraft:milk_bucket"), SkillId.VITALITY, 5, 260),
+    CLEANSE("Cleanse", "Cleanse negative effects, extinguish fire, and recover slightly.", ResourceLocation.parse("minecraft:milk_bucket"), SkillId.VITALITY, 1, 200),
     WARCRY("Rampage", "Short burst of Strength.", ResourceLocation.parse("minecraft:goat_horn"), SkillId.STRENGTH, 5, 2400),
-    EXECUTION("Execute", "Short, High damage strike.", ResourceLocation.parse("minecraft:iron_axe"), SkillId.STRENGTH, 5, 140),
-    CLEAVE("Cleave", "Cleave through enemies in front of you.", ResourceLocation.parse("minecraft:diamond_sword"), SkillId.STRENGTH, 5, 180),
-    GUARD("Guard", "Gain temporary resistance and push mobs back.", ResourceLocation.parse("minecraft:shield"), SkillId.RESISTANCE, 5, 260),
-    OVERPOWER("Bash", "Smash enemies with force and knockback.", ResourceLocation.parse("minecraft:mace"), SkillId.STRENGTH, 5, 200),
-    SCAVENGER("Toxic", "Poison nearby enemies.", ResourceLocation.parse("minecraft:fermented_spider_eye"), SkillId.LUCK, 5, 200),
+    EXECUTION("Execute", "Short, High damage strike.", ResourceLocation.parse("minecraft:iron_axe"), SkillId.STRENGTH, 4, 140),
+    CLEAVE("Cleave", "Cleave through enemies in front of you.", ResourceLocation.parse("minecraft:diamond_sword"), SkillId.STRENGTH, 4, 180),
+    GUARD("Guard", "Gain temporary resistance and push mobs back.", ResourceLocation.parse("minecraft:shield"), SkillId.RESISTANCE, 4, 260),
+    OVERPOWER("Bash", "Smash enemies with force and knockback.", ResourceLocation.parse("minecraft:mace"), SkillId.STRENGTH, 4, 200),
+    SCAVENGER("Toxic", "Poison nearby enemies.", ResourceLocation.parse("minecraft:fermented_spider_eye"), SkillId.LUCK, 2, 200),
     BLAST("Blast", "Summon an explosion.", ResourceLocation.parse("minecraft:tnt"), SkillId.STRENGTH, 5, 250),
-    BLAZE("Blaze", "Ignite nearby enemies on fire, +radius per lv, ignites into soul fire on lv 5.", ResourceLocation.parse("minecraft:blaze_powder"), SkillId.RESISTANCE, 5, 200),
-    GLACIER("Glacier", "Summon a Piercing icicle, +1 piercing per lv, bursts into shrapnel on lv 5", ResourceLocation.parse("minecraft:packed_ice"), SkillId.LUCK, 5, 170),
+    BLAZE("Blaze", "Ignite nearby enemies on fire and gain soul fire at max level.", ResourceLocation.parse("minecraft:blaze_powder"), SkillId.RESISTANCE, 2, 200),
+    GLACIER("Glacier", "Summon icy projectiles, +1 projectile per level, bursts into shrapnel on max level.", ResourceLocation.parse("minecraft:packed_ice"), SkillId.LUCK, 5, 170),
     SMITE("Smite", "Smite an enemy with lighting, +1 bold per lv ", ResourceLocation.parse("minecraft:lightning_rod"), SkillId.RESISTANCE, 5, 180);
 
     private final String title;
@@ -62,7 +62,7 @@ public enum AbilityId {
     }
 
     public int maxRank() {
-        return AbilityConfig.maxRank(this);
+        return Math.max(1, Math.min(defaultMaxRank, AbilityConfig.maxRank(this)));
     }
 
     public int defaultMaxRank() {

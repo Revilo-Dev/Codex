@@ -42,18 +42,16 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
     }
 
     public boolean tryUpgrade(AbilityId id) {
-        if (id == null || !AbilityConfig.enabled(id)) return false;
+        if (!canUpgrade(id)) return false;
         int cur = rank(id);
-        if (cur >= id.maxRank() || points <= 0) return false;
         points--;
         ranks.put(id, cur + 1);
         return true;
     }
 
     public boolean tryDowngrade(AbilityId id) {
-        if (id == null) return false;
+        if (!canDowngrade(id)) return false;
         int cur = rank(id);
-        if (cur <= 0) return false;
         int next = cur - 1;
         ranks.put(id, next);
         points++;
@@ -62,6 +60,26 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
             activeTicks.remove(id);
             recent.remove(id);
         }
+        return true;
+    }
+
+    public boolean canUpgrade(AbilityId id) {
+        if (id == null || !AbilityConfig.enabled(id)) return false;
+        int cur = rank(id);
+        if (cur >= id.maxRank() || points <= 0) return false;
+        if (id == AbilityId.LUNGE && rank(AbilityId.DASH) <= 0) return false;
+        if (id == AbilityId.BLAZE && rank(AbilityId.SCAVENGER) > 0) return false;
+        if (id == AbilityId.SCAVENGER && rank(AbilityId.BLAZE) > 0) return false;
+        if (id == AbilityId.EXECUTION && rank(AbilityId.OVERPOWER) > 0) return false;
+        if (id == AbilityId.OVERPOWER && rank(AbilityId.EXECUTION) > 0) return false;
+        return true;
+    }
+
+    public boolean canDowngrade(AbilityId id) {
+        if (id == null) return false;
+        int cur = rank(id);
+        if (cur <= 0) return false;
+        if (id == AbilityId.DASH && cur == 1 && rank(AbilityId.LUNGE) > 0) return false;
         return true;
     }
 

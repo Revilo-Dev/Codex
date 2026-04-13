@@ -48,7 +48,7 @@ public final class AbilityHudOverlay {
 
         boolean showGrid = Screen.hasAltDown();
         List<AbilityId> displayed = showGrid
-                ? AbilityRegistry.all().stream().map(AbilityDefinition::id).toList()
+                ? AbilityRegistry.all().stream().map(AbilityDefinition::id).filter(abilities::unlocked).toList()
                 : abilities.recentAbilities();
         if (displayed.isEmpty()) return;
 
