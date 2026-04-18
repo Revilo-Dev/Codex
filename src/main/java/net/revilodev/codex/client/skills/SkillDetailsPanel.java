@@ -215,7 +215,10 @@ public final class SkillDetailsPanel extends AbstractWidget {
             case LEAPING -> "+" + fmt(SkillBalance.leapingBonus(level) * 100.0D) + "% jump height";
             case VITALITY -> "+" + fmt(SkillBalance.vitalityHearts(level)) + " hearts";
             case REGENERATION -> "+" + fmt(SkillBalance.regenHeartsPerSecond(level) * 100.0D) + "% regen";
-            case HEALTH_BOOST -> "+" + fmt(SkillBalance.lifeLeach(level) * 100.0D) + "% life steal";
+            case HEALTH_BOOST -> "+" + fmt(SkillBalance.lifeLeach(level) * 100.0D)
+                    + "% chance to steal "
+                    + fmt(SkillBalance.lifeLeach(level) * 100.0D)
+                    + "% max health";
             case CLEANSE -> "-" + fmt(SkillBalance.cleanseImmunities(level) * 100.0D) + "% negative effect duration and strength";
             case LUCK -> "+" + fmt(SkillBalance.luck(level)) + " luck";
             case LOOTING -> "+" + fmt(SkillBalance.lootingChance(level) * 100.0D) + "% looting";

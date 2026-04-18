@@ -1,8 +1,11 @@
 package net.revilodev.codex.skills.logic;
 
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.projectile.AbstractArrow;
@@ -26,6 +29,7 @@ import net.revilodev.codex.skills.SkillsAttachments;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import org.joml.Vector3f;
 
 public final class SkillEvents {
     private SkillEvents() {}
@@ -97,7 +101,16 @@ public final class SkillEvents {
             }
             int lifeLeach = data.level(SkillId.HEALTH_BOOST);
             if (lifeLeach > 0 && amt > 0.0F) {
-                attacker.heal((float) (amt * SkillBalance.lifeLeach(lifeLeach)));
+                double leachPercent = SkillBalance.lifeLeach(lifeLeach);
+                if (attacker.getRandom().nextDouble() < leachPercent) {
+                    LivingEntity target = event.getEntity();
+                    float stolen = (float) (target.getMaxHealth() * leachPercent);
+                    if (stolen > 0.0F) {
+                        amt += stolen;
+                        attacker.heal(stolen);
+                        spawnLifeLeachParticles(attacker, target);
+                    }
+                }
             }
             int crit = data.level(SkillId.CRIT_POWER);
             if (crit > 0 && isCritical(attacker)) {
@@ -195,6 +208,27 @@ public final class SkillEvents {
         if (player.isInWater() || player.isInLava()) return false;
         if (player.isPassenger()) return false;
         return player.fallDistance > 0.0F;
+    }
+
+    private static void spawnLifeLeachParticles(ServerPlayer attacker, LivingEntity target) {
+        if (!(attacker.level() instanceof ServerLevel level)) return;
+
+        Vector3f color = new Vector3f(1.0F, 0.1F, 0.1F);
+        DustParticleOptions redDust = new DustParticleOptions(color, 1.0F);
+
+        int count = 20;
+        for (int i = 0; i < count; i++) {
+            double t = (i + 1.0D) / (count + 1.0D);
+            double baseX = target.getX() + (attacker.getX() - target.getX()) * t;
+            double baseY = target.getY(0.6D) + (attacker.getY(0.8D) - target.getY(0.6D)) * t;
+            double baseZ = target.getZ() + (attacker.getZ() - target.getZ()) * t;
+
+            double velocityX = (attacker.getX() - baseX) * 0.08D;
+            double velocityY = (attacker.getY(0.8D) - baseY) * 0.08D;
+            double velocityZ = (attacker.getZ() - baseZ) * 0.08D;
+
+            level.sendParticles(redDust, baseX, baseY, baseZ, 0, velocityX, velocityY, velocityZ, 1.0D);
+        }
     }
 
     private static MobEffectInstance scaledNegativeEffect(MobEffectInstance effect, double reduction) {
