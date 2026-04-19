@@ -101,10 +101,11 @@ public final class SkillEvents {
             }
             int lifeLeach = data.level(SkillId.HEALTH_BOOST);
             if (lifeLeach > 0 && amt > 0.0F) {
-                double leachPercent = SkillBalance.lifeLeach(lifeLeach);
-                if (attacker.getRandom().nextDouble() < leachPercent) {
+                double leachChance = SkillBalance.lifeLeach(lifeLeach);
+                double leachAmount = SkillBalance.lifeLeachAmount();
+                if (attacker.getRandom().nextDouble() < leachChance) {
                     LivingEntity target = event.getEntity();
-                    float stolen = (float) (target.getMaxHealth() * leachPercent);
+                    float stolen = (float) (target.getMaxHealth() * leachAmount);
                     if (stolen > 0.0F) {
                         amt += stolen;
                         attacker.heal(stolen);

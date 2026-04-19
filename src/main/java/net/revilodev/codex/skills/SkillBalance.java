@@ -55,6 +55,10 @@ public final class SkillBalance {
         return clamp(level * SkillConfig.lifeLeachPerLevel(), 0.0D, 1.0D);
     }
 
+    public static double lifeLeachAmount() {
+        return 0.01D;
+    }
+
     public static double cleanseImmunities(int level) {
         return clamp(level * SkillConfig.cleanseImmunitiesPerLevel(), 0.0D, 1.0D);
     }

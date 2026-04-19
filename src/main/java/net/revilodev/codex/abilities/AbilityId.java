@@ -18,7 +18,7 @@ public enum AbilityId {
     BLAST("Blast", "Summon an explosion.", ResourceLocation.parse("minecraft:tnt"), SkillId.STRENGTH, 5, 250),
     BLAZE("Blaze", "Ignite nearby enemies on fire and gain soul fire at max level.", ResourceLocation.parse("minecraft:blaze_powder"), SkillId.RESISTANCE, 2, 200),
     GLACIER("Glacier", "Summon icy projectiles, +1 projectile per level, bursts into shrapnel on max level.", ResourceLocation.parse("minecraft:packed_ice"), SkillId.LUCK, 5, 170),
-    SMITE("Smite", "Smite an enemy with lighting, +1 bold per lv ", ResourceLocation.parse("minecraft:lightning_rod"), SkillId.RESISTANCE, 5, 180);
+    SMITE("Smite", "Smite an enemy with lighting, +1 bolt per level ", ResourceLocation.parse("minecraft:lightning_rod"), SkillId.RESISTANCE, 5, 180);
 
     private final String title;
     private final String description;
