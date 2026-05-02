@@ -15,6 +15,7 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
     private final EnumMap<AbilityId, Integer> ranks = new EnumMap<>(AbilityId.class);
     private final EnumMap<AbilityId, Integer> cooldowns = new EnumMap<>(AbilityId.class);
     private final EnumMap<AbilityId, Integer> activeTicks = new EnumMap<>(AbilityId.class);
+    private final EnumMap<AbilityElement, AbilityId> selectedSpecializations = new EnumMap<>(AbilityElement.class);
     private final List<AbilityId> recent = new ArrayList<>();
 
     public PlayerAbilities() {
@@ -67,11 +68,7 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         if (id == null || !AbilityConfig.enabled(id)) return false;
         int cur = rank(id);
         if (cur >= id.maxRank() || points <= 0) return false;
-        if (id == AbilityId.LUNGE && rank(AbilityId.DASH) <= 0) return false;
-        if (id == AbilityId.BLAZE && rank(AbilityId.SCAVENGER) > 0) return false;
-        if (id == AbilityId.SCAVENGER && rank(AbilityId.BLAZE) > 0) return false;
-        if (id == AbilityId.EXECUTION && rank(AbilityId.OVERPOWER) > 0) return false;
-        if (id == AbilityId.OVERPOWER && rank(AbilityId.EXECUTION) > 0) return false;
+        if (id.required() != null && rank(id.required()) <= 0) return false;
         return true;
     }
 
@@ -79,7 +76,11 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         if (id == null) return false;
         int cur = rank(id);
         if (cur <= 0) return false;
-        if (id == AbilityId.DASH && cur == 1 && rank(AbilityId.LUNGE) > 0) return false;
+        if (cur == 1) {
+            for (AbilityId other : AbilityId.values()) {
+                if (other.required() == id && rank(other) > 0) return false;
+            }
+        }
         return true;
     }
 
@@ -114,6 +115,16 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         int next = Math.max(0, ticks);
         if (next <= 0) activeTicks.remove(id);
         else activeTicks.put(id, next);
+    }
+
+    public AbilityId selectedSpecialization(AbilityElement element) {
+        return selectedSpecializations.get(element);
+    }
+
+    public boolean selectSpecialization(AbilityId id) {
+        if (id == null || !id.isSpecialization() || !unlocked(id)) return false;
+        selectedSpecializations.put(id.element(), id);
+        return true;
     }
 
     public boolean tickCooldowns() {
@@ -151,6 +162,7 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         ranks.clear();
         cooldowns.clear();
         activeTicks.clear();
+        selectedSpecializations.clear();
         recent.clear();
         for (AbilityId id : AbilityId.values()) {
             ranks.put(id, 0);
@@ -177,10 +189,15 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         tag.put("cooldowns", cooldownTag);
         tag.put("active", activeTag);
         CompoundTag recentTag = new CompoundTag();
+        CompoundTag selectedTag = new CompoundTag();
         for (int i = 0; i < recent.size(); i++) {
             recentTag.putString("recent" + i, recent.get(i).name());
         }
+        for (var entry : selectedSpecializations.entrySet()) {
+            selectedTag.putString(entry.getKey().name(), entry.getValue().name());
+        }
         tag.put("recent", recentTag);
+        tag.put("selectedSpecializations", selectedTag);
         return tag;
     }
 
@@ -194,6 +211,7 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
         CompoundTag cooldownTag = nbt.getCompound("cooldowns");
         CompoundTag activeTag = nbt.getCompound("active");
         CompoundTag recentTag = nbt.getCompound("recent");
+        CompoundTag selectedTag = nbt.getCompound("selectedSpecializations");
         for (AbilityId id : AbilityId.values()) {
             if (ranksTag.contains(id.name())) {
                 ranks.put(id, Math.max(0, Math.min(id.maxRank(), ranksTag.getInt(id.name()))));
@@ -209,6 +227,12 @@ public final class PlayerAbilities implements INBTSerializable<CompoundTag> {
             AbilityId id = parseAbility(recentTag.getString("recent" + i));
             if (id != null && unlocked(id) && !recent.contains(id)) {
                 recent.add(id);
+            }
+        }
+        for (AbilityElement element : AbilityElement.values()) {
+            AbilityId id = parseAbility(selectedTag.getString(element.name()));
+            if (id != null && id.element() == element && unlocked(id)) {
+                selectedSpecializations.put(element, id);
             }
         }
     }

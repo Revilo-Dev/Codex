@@ -53,6 +53,7 @@ public final class AbilitiesNetwork {
             boolean changed = switch (payload.action()) {
                 case 0 -> abilities.tryUpgrade(id);
                 case 1 -> abilities.tryDowngrade(id);
+                case 2 -> abilities.selectSpecialization(id);
                 default -> false;
             };
             if (!changed) return;

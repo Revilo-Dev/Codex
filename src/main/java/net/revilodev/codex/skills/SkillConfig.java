@@ -32,7 +32,7 @@ public final class SkillConfig {
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.push("progression");
-        POINTS_PER_LEVEL = builder.defineInRange("pointsPerLevel", 1, 0, 10);
+        POINTS_PER_LEVEL = builder.defineInRange("skillPointsPerLevelUp", 1, 0, 10);
         builder.pop();
 
         builder.push("items");

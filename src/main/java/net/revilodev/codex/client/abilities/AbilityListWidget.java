@@ -1,5 +1,6 @@
 package net.revilodev.codex.client.abilities;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -10,6 +11,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.revilodev.codex.CodexMod;
 import net.revilodev.codex.abilities.AbilitiesAttachments;
+import net.revilodev.codex.abilities.AbilityElement;
 import net.revilodev.codex.abilities.AbilityDefinition;
 import net.revilodev.codex.abilities.AbilityId;
 import net.revilodev.codex.abilities.AbilityRegistry;
@@ -28,13 +30,34 @@ public final class AbilityListWidget extends AbstractWidget {
     private static final ResourceLocation WIDGET_DISABLED_TEX =
             ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-disabled.png");
     private static final ResourceLocation WIDGET_PRIMARY_TEX =
-            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget-primary.png");
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/ability-primary.png");
+    private static final ResourceLocation WIDGET_PRIMARY_DISABLED_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/ability-primary-disabled.png");
     private static final ResourceLocation WIDGET_PRIMARY_HOVER_TEX =
-            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/skill_widget_primary-hovered.png");
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/ability-primary-hovered.png");
+    private static final ResourceLocation LINK_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/link.png");
+    private static final ResourceLocation LINK_DISABLED_TEX =
+            ResourceLocation.fromNamespaceAndPath(CodexMod.MOD_ID, "textures/gui/sprites/link-disabled.png");
 
     private static final int HEADER_HEIGHT = 11;
     private static final int CELL_SIZE = 23;
-    private static final int GAP = 3;
+    private static final int GAP = 1;
+    private static final int VIEWPORT_W = 131;
+    private static final int VIEWPORT_H = 143;
+    private static final int LINK_WIDTH = 10;
+    private static final int LINK_HEIGHT = 20;
+    private static final int VIEWPORT_OFFSET_X = 18;
+    private static final int VIEWPORT_OFFSET_Y = -1;
+    private static final List<AbilityElement> COLUMN_ORDER = List.of(
+            AbilityElement.FIRE,
+            AbilityElement.ICE,
+            AbilityElement.LIGHTNING,
+            AbilityElement.POISON,
+            AbilityElement.FORCE,
+            AbilityElement.MAGIC,
+            AbilityElement.WIND
+    );
 
     private final Minecraft mc = Minecraft.getInstance();
     private final Consumer<AbilityDefinition> onClick;
@@ -42,7 +65,12 @@ public final class AbilityListWidget extends AbstractWidget {
     private AbilityId selected;
     private boolean headerVisible = true;
     private boolean showLocked = true;
-    private LineArea hoveredLine;
+    private int offsetX = 0;
+    private int offsetY = 0;
+    private boolean dragging = false;
+    private int viewportExtraOffsetX = 0;
+    private int viewportExtraWidth = 0;
+    private int headerTextOffsetX = 0;
 
     public AbilityListWidget(int x, int y, int w, int h, Consumer<AbilityDefinition> onClick) {
         super(x, y, w, h, Component.empty());
@@ -52,19 +80,38 @@ public final class AbilityListWidget extends AbstractWidget {
 
     public void reloadAbilities() {
         nodes.clear();
-        List<AbilityDefinition> visibleAbilities = AbilityRegistry.all();
-        if (!showLocked && mc.player != null) {
-            PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-            visibleAbilities = visibleAbilities.stream()
-                    .filter(def -> abilities.unlocked(def.id()))
-                    .toList();
-            if (selected != null && visibleAbilities.stream().noneMatch(def -> def.id() == selected)) {
-                selected = null;
-                if (onClick != null) onClick.accept(null);
+        List<AbilityDefinition> all = AbilityRegistry.all();
+        PlayerAbilities abilities = mc.player == null ? null : mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
+
+        for (int col = 0; col < COLUMN_ORDER.size(); col++) {
+            AbilityElement element = COLUMN_ORDER.get(col);
+            AbilityDefinition core = all.stream().filter(def -> def.element() == element && def.type() == net.revilodev.codex.abilities.AbilityNodeType.CORE).findFirst().orElse(null);
+            if (core == null) continue;
+            if (!showLocked && abilities != null && !abilities.unlocked(core.id())) continue;
+            nodes.add(new Node(core, col, 0));
+
+            AbilityId cursor = core.id();
+            int row = 1;
+            while (true) {
+                AbilityDefinition next = null;
+                for (AbilityDefinition def : all) {
+                    if (def.required() == cursor) {
+                        next = def;
+                        break;
+                    }
+                }
+                if (next == null) break;
+                if (showLocked || abilities == null || abilities.unlocked(next.id())) {
+                    nodes.add(new Node(next, col, row));
+                }
+                cursor = next.id();
+                row++;
             }
         }
-        for (int i = 0; i < visibleAbilities.size(); i++) {
-            nodes.add(new Node(visibleAbilities.get(i), i % 5, i / 5));
+
+        if (!showLocked && selected != null && nodes.stream().noneMatch(n -> n.def.id() == selected)) {
+            selected = null;
+            if (onClick != null) onClick.accept(null);
         }
     }
 
@@ -88,16 +135,32 @@ public final class AbilityListWidget extends AbstractWidget {
         reloadAbilities();
     }
 
+    public void setViewportTweaks(int extraOffsetX, int extraWidth) {
+        this.viewportExtraOffsetX = extraOffsetX;
+        this.viewportExtraWidth = extraWidth;
+    }
+
+    public void setHeaderTextOffsetX(int offset) {
+        this.headerTextOffsetX = offset;
+    }
+
     public boolean isOnAbilityNode(double mx, double my) {
         return nodeAt(mx, my) != null;
     }
 
     public static int gridWidth() {
-        return 5 * CELL_SIZE + 4 * GAP;
+        return 7 * CELL_SIZE + 6 * GAP;
     }
 
     public static int gridHeight() {
-        int rows = Math.max(1, (int) Math.ceil(AbilityRegistry.all().size() / 5.0D));
+        int rows = 1;
+        for (AbilityElement element : COLUMN_ORDER) {
+            int count = 0;
+            for (AbilityDefinition def : AbilityRegistry.all()) {
+                if (def.element() == element) count++;
+            }
+            rows = Math.max(rows, count);
+        }
         return rows * CELL_SIZE + Math.max(0, rows - 1) * GAP;
     }
 
@@ -109,47 +172,62 @@ public final class AbilityListWidget extends AbstractWidget {
     protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
         if (!visible || mc.player == null) return;
         PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
-        hoveredLine = null;
         if (!showLocked) {
             reloadAbilities();
         }
         if (headerVisible) {
-            drawScaledText(gg, "Ability Points: " + abilities.points(), getX() + 1, getY() + 4, 0xC78CFF, 0.85F);
+            drawScaledText(gg, "Ability Points: " + abilities.points(), getX() + 1 + headerTextOffsetX, getY() + 4, 0xC78CFF, 0.85F);
         }
 
-        if (selected == AbilityId.BLAZE || selected == AbilityId.SCAVENGER) {
-            drawIncompatibilityLine(gg, mouseX, mouseY, AbilityId.SCAVENGER, AbilityId.BLAZE);
-        }
-        if (selected == AbilityId.EXECUTION || selected == AbilityId.OVERPOWER) {
-            drawIncompatibilityLine(gg, mouseX, mouseY, AbilityId.EXECUTION, AbilityId.OVERPOWER);
-        }
-        if (selected == AbilityId.LUNGE) {
-            drawRequiredLine(gg, mouseX, mouseY);
-        }
+        int viewportX = getX() + VIEWPORT_OFFSET_X + viewportExtraOffsetX;
+        int viewportY = getY() + HEADER_HEIGHT + VIEWPORT_OFFSET_Y;
+        int viewportW = Math.min(width, VIEWPORT_W + viewportExtraWidth);
+        int viewportH = Math.min(height - HEADER_HEIGHT, VIEWPORT_H);
+        int maxOffsetX = Math.max(0, gridWidth() - viewportW);
+        int maxOffsetY = Math.max(0, gridHeight() - viewportH);
+        offsetX = Math.max(0, Math.min(offsetX, maxOffsetX));
+        offsetY = Math.max(0, Math.min(offsetY, maxOffsetY));
 
-        int top = getY() + HEADER_HEIGHT;
+        int top = viewportY;
+        RenderSystem.enableBlend();
+        gg.enableScissor(viewportX, viewportY, viewportX + viewportW, viewportY + viewportH);
         for (Node node : nodes) {
-            int x = getX() + node.col * (CELL_SIZE + GAP);
-            int y = top + node.row * (CELL_SIZE + GAP);
+            if (node.row <= 0 || node.def.required() == null) continue;
+            int x = viewportX + node.col * (CELL_SIZE + GAP) - offsetX;
+            int y = top + node.row * (CELL_SIZE + GAP) - offsetY;
+            ResourceLocation tex = abilities.canUpgrade(node.def.id()) || abilities.unlocked(node.def.id()) ? LINK_TEX : LINK_DISABLED_TEX;
+            int linkX = x + (CELL_SIZE - LINK_WIDTH) / 2;
+            int linkY = y - ((LINK_HEIGHT - GAP) / 2);
+            gg.blit(tex, linkX, linkY, 0, 0, LINK_WIDTH, LINK_HEIGHT, LINK_WIDTH, LINK_HEIGHT);
+        }
+
+        for (Node node : nodes) {
+            int x = viewportX + node.col * (CELL_SIZE + GAP) - offsetX;
+            int y = top + node.row * (CELL_SIZE + GAP) - offsetY;
             AbilityDefinition def = node.def;
             boolean hovered = mouseX >= x && mouseX <= x + CELL_SIZE && mouseY >= y && mouseY <= y + CELL_SIZE;
             int rank = abilities.rank(def.id());
             boolean unlocked = rank > 0;
             boolean maxed = rank >= def.maxRank();
+            boolean primary = def.type() == net.revilodev.codex.abilities.AbilityNodeType.CORE;
 
-            ResourceLocation tex = unlocked || selected == def.id() || hovered ? WIDGET_HOVER_TEX : WIDGET_DISABLED_TEX;
-            if (maxed) {
+            ResourceLocation tex;
+            if (primary && !unlocked) {
+                tex = WIDGET_PRIMARY_DISABLED_TEX;
+            } else if (!primary && !abilities.canUpgrade(def.id()) && !unlocked) {
+                tex = WIDGET_DISABLED_TEX;
+            } else if (primary) {
                 tex = (selected == def.id() || hovered) ? WIDGET_PRIMARY_HOVER_TEX : WIDGET_PRIMARY_TEX;
-            } else if (unlocked && !hovered && selected != def.id()) {
-                tex = WIDGET_TEX;
+            } else {
+                tex = (selected == def.id() || hovered) ? WIDGET_HOVER_TEX : WIDGET_TEX;
+            }
+            if (maxed && !primary) {
+                tex = (selected == def.id() || hovered) ? WIDGET_PRIMARY_HOVER_TEX : WIDGET_PRIMARY_TEX;
             }
             drawScaledTile(gg, tex, x, y, CELL_SIZE, CELL_SIZE);
             gg.blit(def.iconTexture(), x + 3, y + 3, 0, 0, 16, 16, 16, 16);
         }
-
-        if (hoveredLine != null) {
-            gg.renderTooltip(mc.font, Component.literal(hoveredLine.tooltip()), mouseX, mouseY);
-        }
+        gg.disableScissor();
     }
 
     @Override
@@ -170,10 +248,11 @@ public final class AbilityListWidget extends AbstractWidget {
     protected void updateWidgetNarration(NarrationElementOutput narration) {}
 
     private Node nodeAt(double mx, double my) {
-        int top = getY() + HEADER_HEIGHT;
+        int viewportX = getX() + VIEWPORT_OFFSET_X + viewportExtraOffsetX;
+        int top = getY() + HEADER_HEIGHT + VIEWPORT_OFFSET_Y;
         for (Node node : nodes) {
-            int x = getX() + node.col * (CELL_SIZE + GAP);
-            int y = top + node.row * (CELL_SIZE + GAP);
+            int x = viewportX + node.col * (CELL_SIZE + GAP) - offsetX;
+            int y = top + node.row * (CELL_SIZE + GAP) - offsetY;
             if (mx >= x && mx <= x + CELL_SIZE && my >= y && my <= y + CELL_SIZE) {
                 return node;
             }
@@ -181,65 +260,24 @@ public final class AbilityListWidget extends AbstractWidget {
         return null;
     }
 
-    private Node nodeFor(AbilityId id) {
-        if (id == null) return null;
-        for (Node node : nodes) {
-            if (node.def.id() == id) return node;
-        }
-        return null;
+    public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
+        if (!visible || !active) return false;
+        if (!isMouseOver(mouseX, mouseY)) return false;
+        offsetY = Math.max(0, offsetY - (int) Math.round(deltaY * 12.0D));
+        return true;
     }
 
-    private void drawIncompatibilityLine(GuiGraphics gg, int mouseX, int mouseY, AbilityId leftId, AbilityId rightId) {
-        Node toxic = nodeFor(leftId);
-        Node blaze = nodeFor(rightId);
-        if (toxic == null || blaze == null) return;
-
-        int top = getY() + HEADER_HEIGHT;
-        int toxicX = getX() + toxic.col * (CELL_SIZE + GAP);
-        int toxicY = top + toxic.row * (CELL_SIZE + GAP);
-        int blazeX = getX() + blaze.col * (CELL_SIZE + GAP);
-        int blazeY = top + blaze.row * (CELL_SIZE + GAP);
-        int y = Math.max(toxicY, blazeY) + CELL_SIZE + 1 - 13;
-        drawBetweenNodesMarker(gg, toxicX, blazeX, y, 0xFFE05353, mouseX, mouseY, "incompatible");
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (!visible || !active || button != 0) return false;
+        if (!dragging && !isMouseOver(mouseX, mouseY)) return false;
+        dragging = true;
+        offsetX = Math.max(0, offsetX - (int) Math.round(dragX));
+        offsetY = Math.max(0, offsetY - (int) Math.round(dragY));
+        return true;
     }
 
-    private void drawRequiredLine(GuiGraphics gg, int mouseX, int mouseY) {
-        Node leap = nodeFor(AbilityId.LEAP);
-        Node lunge = nodeFor(AbilityId.LUNGE);
-        if (leap == null || lunge == null) return;
-
-        int top = getY() + HEADER_HEIGHT;
-        int leapX = getX() + leap.col * (CELL_SIZE + GAP);
-        int leapY = top + leap.row * (CELL_SIZE + GAP);
-        int lungeX = getX() + lunge.col * (CELL_SIZE + GAP);
-        int lungeY = top + lunge.row * (CELL_SIZE + GAP);
-        int y = Math.max(leapY, lungeY) + CELL_SIZE + 1 - 14;
-        drawBetweenNodesMarker(gg, leapX + 15, lungeX + 15, y, 0xFF4BE36A, mouseX, mouseY, "Required dependency");
-    }
-
-    private void drawBetweenNodesMarker(GuiGraphics gg, int leftNodeX, int rightNodeX, int y, int color, int mouseX, int mouseY, String tooltip) {
-        int c1 = leftNodeX + (CELL_SIZE / 2);
-        int c2 = rightNodeX + (CELL_SIZE / 2);
-        int midpoint = (c1 + c2) / 2;
-        int x1 = midpoint - 7;
-        int x2 = x1 + 14;
-        drawOutlinedBar(gg, x1, x2, y, color);
-        updateHoveredLine(mouseX, mouseY, x1, x2, y, tooltip);
-    }
-
-    private void drawOutlinedBar(GuiGraphics gg, int x1, int x2, int y, int color) {
-        gg.hLine(x1 - 1, x2 + 1, y - 1, 0xFF000000);
-        gg.hLine(x1 - 1, x2 + 1, y + 2, 0xFF000000);
-        gg.vLine(x1 - 1, y - 1, y + 2, 0xFF000000);
-        gg.vLine(x2 + 1, y - 1, y + 2, 0xFF000000);
-        gg.hLine(x1, x2, y, color);
-        gg.hLine(x1, x2, y + 1, color);
-    }
-
-    private void updateHoveredLine(int mouseX, int mouseY, int x1, int x2, int y, String tooltip) {
-        if (mouseX >= x1 - 1 && mouseX <= x2 + 1 && mouseY >= y - 1 && mouseY <= y + 2) {
-            hoveredLine = new LineArea(tooltip);
-        }
+    public void endDrag() {
+        dragging = false;
     }
 
     private void drawScaledTile(GuiGraphics gg, ResourceLocation tex, int x, int y, int w, int h) {
@@ -259,5 +297,4 @@ public final class AbilityListWidget extends AbstractWidget {
     }
 
     private record Node(AbilityDefinition def, int col, int row) {}
-    private record LineArea(String tooltip) {}
 }

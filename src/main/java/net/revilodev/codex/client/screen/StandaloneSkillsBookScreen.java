@@ -70,7 +70,9 @@ public final class StandaloneSkillsBookScreen extends Screen {
             abilityList.setSelected(def == null ? null : def.id());
         });
         abilityList.setShowLocked(true);
+        abilityList.setHeaderTextOffsetX(15);
         abilityDetails = new AbilityDetailsPanel(detailsX, detailsY, detailsW, detailsH);
+        abilityDetails.setContentTopOffset(3);
 
         skillsTab = new PanelTabButton(panelX - 31, panelY + 6, PanelTab.SKILLS, () -> setTab(PanelTab.SKILLS));
         abilitiesTab = new PanelTabButton(panelX - 31, panelY + 34, PanelTab.ABILITIES, () -> setTab(PanelTab.ABILITIES));
@@ -83,6 +85,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
         addRenderableWidget(abilityDetails);
         addRenderableWidget(abilityDetails.upgradeButton());
         addRenderableWidget(abilityDetails.downgradeButton());
+        addRenderableWidget(abilityDetails.selectButton());
         addRenderableWidget(skillsTab);
         addRenderableWidget(abilitiesTab);
 
@@ -111,6 +114,9 @@ public final class StandaloneSkillsBookScreen extends Screen {
         if (activeTab == PanelTab.SKILLS && skillsDetails != null && skillsDetails.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) {
             return true;
         }
+        if (activeTab == PanelTab.ABILITIES && abilityList != null && abilityList.mouseScrolled(mouseX, mouseY, scrollY)) {
+            return true;
+        }
         if (activeTab == PanelTab.ABILITIES && abilityDetails != null && abilityDetails.mouseScrolled(mouseX, mouseY, scrollX, scrollY)) {
             return true;
         }
@@ -125,7 +131,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
                 boolean inListNode = skillsList.isOnSkillNode(mouseX, mouseY);
                 boolean onButton = skillsDetails.isOnButtons(mouseX, mouseY);
                 boolean inDetails = skillsDetails.containsPoint(mouseX, mouseY);
-                if (!inListNode && !onButton && !inDetails) {
+                if (!used && !inListNode && !onButton && !inDetails) {
                     skillsDetails.setSkill(null);
                     skillsList.setSelected(null);
                 }
@@ -133,7 +139,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
                 boolean inListNode = abilityList.isOnAbilityNode(mouseX, mouseY);
                 boolean onButton = abilityDetails.isOnButtons(mouseX, mouseY);
                 boolean inDetails = abilityDetails.containsPoint(mouseX, mouseY);
-                if (!inListNode && !onButton && !inDetails) {
+                if (!used && !inListNode && !onButton && !inDetails) {
                     abilityDetails.setAbility(null);
                     abilityList.setSelected(null);
                 }
@@ -170,5 +176,7 @@ public final class StandaloneSkillsBookScreen extends Screen {
         abilityDetails.upgradeButton().active = !skillsActive;
         abilityDetails.downgradeButton().visible = !skillsActive;
         abilityDetails.downgradeButton().active = !skillsActive;
+        abilityDetails.selectButton().visible = !skillsActive;
+        abilityDetails.selectButton().active = !skillsActive;
     }
 }

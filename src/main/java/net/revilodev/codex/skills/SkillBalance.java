@@ -51,8 +51,8 @@ public final class SkillBalance {
         return level * SkillConfig.vitalityHeartsPerLevel();
     }
 
-    public static double lifeLeach(int level) {
-        return clamp(level * SkillConfig.lifeLeachPerLevel(), 0.0D, 1.0D);
+    public static double lifeLeach(int luckLevel) {
+        return clamp(0.005D + (Math.max(0, luckLevel) * 0.005D), 0.0D, 1.0D);
     }
 
     public static double lifeLeachAmount() {

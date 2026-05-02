@@ -25,12 +25,15 @@ import net.revilodev.codex.abilities.logic.AbilityScaling;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 @OnlyIn(Dist.CLIENT)
 public final class AbilityKeybinds {
     private static final String CATEGORY = "key.categories.codex";
     private static final Map<AbilityId, KeyMapping> KEYS = new EnumMap<>(AbilityId.class);
+    private static final Set<KeyMapping> UNIQUE_KEYS = new HashSet<>();
     private static boolean altWasDown = false;
     private static int altSelectionIndex = 0;
     private static boolean altSelectionChanged = false;
@@ -104,7 +107,7 @@ public final class AbilityKeybinds {
     }
 
     private static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
-        for (KeyMapping key : KEYS.values()) event.register(key);
+        for (KeyMapping key : UNIQUE_KEYS) event.register(key);
     }
 
     private static void onClientTick(ClientTickEvent.Post event) {
@@ -132,6 +135,7 @@ public final class AbilityKeybinds {
         altWasDown = altDown;
 
         for (var entry : KEYS.entrySet()) {
+            if (entry.getKey().isCore()) continue;
             while (entry.getValue().consumeClick()) {
                 useAbility(entry.getKey());
             }
@@ -157,25 +161,59 @@ public final class AbilityKeybinds {
     }
 
     private static void createMappings() {
-        add(AbilityId.DASH, "dash", InputConstants.KEY_Z);
-        add(AbilityId.LEAP, "leap", InputConstants.KEY_X);
-        add(AbilityId.LUNGE, "lunge", InputConstants.KEY_G);
-        add(AbilityId.HEAL, "heal", InputConstants.KEY_C);
-        add(AbilityId.CLEANSE, "cleanse", InputConstants.KEY_V);
-        add(AbilityId.WARCRY, "rampage", InputConstants.KEY_N);
-        add(AbilityId.EXECUTION, "execute", InputConstants.KEY_M);
-        add(AbilityId.CLEAVE, "cleave", InputConstants.KEY_J);
-        add(AbilityId.OVERPOWER, "bash", InputConstants.KEY_K);
-        add(AbilityId.GUARD, "guard", InputConstants.KEY_B);
-        add(AbilityId.BLAST, "blast", InputConstants.KEY_H);
-        add(AbilityId.BLAZE, "blaze", InputConstants.KEY_U);
-        add(AbilityId.GLACIER, "glacier", InputConstants.KEY_I);
-        add(AbilityId.SMITE, "smite", InputConstants.KEY_O);
-        add(AbilityId.SCAVENGER, "toxic", InputConstants.KEY_L);
+        addElementShared(AbilityId.FIRE_BURST, "fire", InputConstants.KEY_Z);
+        addElementShared(AbilityId.FIRE_NOVA, "fire", InputConstants.KEY_Z);
+        addElementShared(AbilityId.FIRE_IMPLODE, "fire", InputConstants.KEY_Z);
+        addElementShared(AbilityId.FIRE_STORM, "fire", InputConstants.KEY_Z);
+
+        addElementShared(AbilityId.ICE_BURST, "ice", InputConstants.KEY_X);
+        addElementShared(AbilityId.ICE_NOVA, "ice", InputConstants.KEY_X);
+        addElementShared(AbilityId.ICE_PIERCE, "ice", InputConstants.KEY_X);
+        addElementShared(AbilityId.ICE_IMPLODE, "ice", InputConstants.KEY_X);
+        addElementShared(AbilityId.ICE_GLACIER, "ice", InputConstants.KEY_X);
+        addElementShared(AbilityId.ICE_STORM, "ice", InputConstants.KEY_X);
+
+        addElementShared(AbilityId.LIGHTNING_STRIKE, "lightning", InputConstants.KEY_C);
+        addElementShared(AbilityId.LIGHTNING_ZAP, "lightning", InputConstants.KEY_C);
+        addElementShared(AbilityId.LIGHTNING_NOVA, "lightning", InputConstants.KEY_C);
+        addElementShared(AbilityId.LIGHTNING_IMPLODE, "lightning", InputConstants.KEY_C);
+        addElementShared(AbilityId.LIGHTNING_STORM, "lightning", InputConstants.KEY_C);
+
+        addElementShared(AbilityId.POISON_BURST, "poison", InputConstants.KEY_V);
+        addElementShared(AbilityId.POISON_NOVA, "poison", InputConstants.KEY_V);
+        addElementShared(AbilityId.POISON_IMPLODE, "poison", InputConstants.KEY_V);
+
+        addElementShared(AbilityId.FORCE_AEGIS, "force", InputConstants.KEY_B);
+        addElementShared(AbilityId.FORCE_BURST, "force", InputConstants.KEY_B);
+        addElementShared(AbilityId.FORCE_RAMPAGE, "force", InputConstants.KEY_B);
+
+        addElementShared(AbilityId.MAGIC_HEAL, "magic", InputConstants.KEY_N);
+        addElementShared(AbilityId.MAGIC_CLEANSE, "magic", InputConstants.KEY_N);
+
+        addElementShared(AbilityId.WIND_DASH, "wind", InputConstants.KEY_M);
+        addElementShared(AbilityId.WIND_LEAP, "wind", InputConstants.KEY_M);
+        addElementShared(AbilityId.WIND_LUNGE, "wind", InputConstants.KEY_M);
     }
 
     private static void add(AbilityId id, String keyName, int defaultKey) {
-        KEYS.put(id, new KeyMapping("key.codex.ability." + keyName, defaultKey, CATEGORY));
+        KeyMapping mapping = new KeyMapping("key.codex.ability." + keyName, defaultKey, CATEGORY);
+        KEYS.put(id, mapping);
+        UNIQUE_KEYS.add(mapping);
+    }
+
+    private static void addElementShared(AbilityId id, String keyName, int defaultKey) {
+        KeyMapping existing = null;
+        for (Map.Entry<AbilityId, KeyMapping> entry : KEYS.entrySet()) {
+            if (entry.getKey().element() == id.element()) {
+                existing = entry.getValue();
+                break;
+            }
+        }
+        if (existing == null) {
+            existing = new KeyMapping("key.codex.ability." + keyName, defaultKey, CATEGORY);
+            UNIQUE_KEYS.add(existing);
+        }
+        KEYS.put(id, existing);
     }
 
     private static void useAbility(AbilityId id) {
@@ -195,18 +233,7 @@ public final class AbilityKeybinds {
         if (data.cooldownTicks(id) > 0) {
             return AbilityUseFail.COOLDOWN;
         }
-        if (mc.player == null) return AbilityUseFail.NO_TARGET;
-        return switch (id) {
-            case LUNGE -> hasTarget(mc, AbilityScaling.lungeDistance(Math.max(1, data.rank(id)), Math.max(0, data.rank(AbilityId.DASH)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
-            case EXECUTION -> hasTarget(mc, 4.5D) ? null : AbilityUseFail.NO_TARGET;
-            case OVERPOWER -> hasTarget(mc, 4.0D) ? null : AbilityUseFail.NO_TARGET;
-            case GLACIER -> hasTarget(mc, 12.0D) ? null : AbilityUseFail.NO_TARGET;
-            case SMITE -> hasNearby(mc, AbilityScaling.smiteRadius(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
-            case CLEAVE -> hasNearbyInFront(mc, AbilityScaling.cleaveRadius(Math.max(1, data.rank(id)), 1.0D)) ? null : AbilityUseFail.NO_TARGET;
-            case BLAST -> hasNearby(mc, AbilityScaling.blastRadius(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
-            case BLAZE -> hasNearby(mc, AbilityScaling.blazeRadius(Math.max(1, data.rank(id)), null, 1.0D)) ? null : AbilityUseFail.NO_TARGET;
-            default -> null;
-        };
+        return mc.player == null ? AbilityUseFail.NO_TARGET : null;
     }
 
     private static boolean hasTarget(Minecraft mc, double range) {

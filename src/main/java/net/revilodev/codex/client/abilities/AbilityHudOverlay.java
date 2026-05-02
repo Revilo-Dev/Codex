@@ -52,21 +52,36 @@ public final class AbilityHudOverlay {
                 : abilities.recentAbilities();
         if (displayed.isEmpty()) return;
 
-        int baseX = 8;
+        int columns = showGrid ? Math.min(GRID_COLUMNS, displayed.size()) : displayed.size();
+        int rows = showGrid ? (int) Math.ceil(displayed.size() / (double) GRID_COLUMNS) : 1;
+        int contentWidth = SLOT_SIZE + (Math.max(0, columns - 1) * SLOT_STEP);
+        int contentHeight = SLOT_SIZE + (Math.max(0, rows - 1) * SLOT_STEP);
+        Origin origin = resolveOrigin(gg, contentWidth, contentHeight, AbilityConfig.hudPosition());
+
         if (showGrid) {
-            int rows = (int) Math.ceil(displayed.size() / (double) GRID_COLUMNS);
-            int baseY = gg.guiHeight() - 8 - (rows * SLOT_STEP);
             for (int i = 0; i < displayed.size(); i++) {
                 int col = i % GRID_COLUMNS;
                 int row = i / GRID_COLUMNS;
-                drawAbility(gg, mc.font, baseX + col * SLOT_STEP, baseY + row * SLOT_STEP, displayed.get(i), abilities, skills, displayed.get(i) == AbilityKeybinds.altSelection());
+                drawAbility(gg, mc.font, origin.x + col * SLOT_STEP, origin.y + row * SLOT_STEP, displayed.get(i), abilities, skills, displayed.get(i) == AbilityKeybinds.altSelection());
             }
         } else {
-            int baseY = gg.guiHeight() - 28;
             for (int i = 0; i < displayed.size(); i++) {
-                drawAbility(gg, mc.font, baseX + i * SLOT_STEP, baseY, displayed.get(i), abilities, skills, false);
+                drawAbility(gg, mc.font, origin.x + i * SLOT_STEP, origin.y, displayed.get(i), abilities, skills, false);
             }
         }
+    }
+
+    private static Origin resolveOrigin(GuiGraphics gg, int contentWidth, int contentHeight, AbilityConfig.HudPosition position) {
+        int margin = 8;
+        int x = switch (position) {
+            case TOP_RIGHT, BOTTOM_RIGHT -> gg.guiWidth() - margin - contentWidth;
+            default -> margin;
+        };
+        int y = switch (position) {
+            case TOP_LEFT, TOP_RIGHT -> margin;
+            default -> gg.guiHeight() - margin - contentHeight;
+        };
+        return new Origin(x, y);
     }
 
     private static void drawAbility(GuiGraphics gg, Font font, int x, int y, AbilityId id, PlayerAbilities abilities, PlayerSkills skills, boolean selected) {
@@ -153,4 +168,6 @@ public final class AbilityHudOverlay {
         AbilityKeybinds.AbilityUseFail reason;
         long untilMs;
     }
+
+    private record Origin(int x, int y) {}
 }

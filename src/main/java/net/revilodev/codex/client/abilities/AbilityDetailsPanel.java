@@ -29,7 +29,7 @@ import java.util.List;
 public final class AbilityDetailsPanel extends AbstractWidget {
     private static final float SMALL_TEXT_SCALE = 0.62F;
     private static final float HEADER_TEXT_SCALE = 0.62F;
-    private static final int CONTENT_TOP = 20;
+    private static final int CONTENT_TOP = 23;
     private static final int CONTENT_BOTTOM_PADDING = 24;
     private static final int HEADER_ICON_SIZE = 12;
     private static final int SMALL_LINE_STEP = 5;
@@ -49,6 +49,7 @@ public final class AbilityDetailsPanel extends AbstractWidget {
     private final Minecraft mc = Minecraft.getInstance();
     private final UpgradeButton upgrade = new UpgradeButton(0, 0);
     private final DowngradeButton downgrade = new DowngradeButton(0, 0);
+    private final SelectButton select = new SelectButton(0, 0);
     private AbilityDefinition ability;
     private float scrollY;
     private int contentHeight;
@@ -56,6 +57,7 @@ public final class AbilityDetailsPanel extends AbstractWidget {
     private int keybindTop;
     private int keybindRight;
     private int keybindBottom;
+    private int contentTopOffset = 0;
 
     public AbilityDetailsPanel(int x, int y, int w, int h) {
         super(x, y, w, h, Component.empty());
@@ -64,6 +66,7 @@ public final class AbilityDetailsPanel extends AbstractWidget {
 
     public AbstractButton upgradeButton() { return upgrade; }
     public AbstractButton downgradeButton() { return downgrade; }
+    public AbstractButton selectButton() { return select; }
     public boolean hasAbility() { return ability != null; }
 
     public void setBounds(int x, int y, int w, int h) {
@@ -76,16 +79,28 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         int start = x + (w - total) / 2;
         upgrade.setPosition(start, bottomY);
         downgrade.setPosition(start + upgrade.getWidth() + 2, bottomY);
+        select.setPosition(x + (w - select.getWidth()) / 2, bottomY);
     }
 
     public void setAbility(AbilityDefinition ability) {
         this.ability = ability;
         this.scrollY = 0.0F;
+        if (ability == null) {
+            upgrade.visible = false;
+            downgrade.visible = false;
+            select.visible = false;
+            select.active = false;
+        }
+    }
+
+    public void setContentTopOffset(int contentTopOffset) {
+        this.contentTopOffset = contentTopOffset;
     }
 
     public boolean isOnButtons(double mx, double my) {
         return (upgrade.visible && upgrade.isMouseOver(mx, my))
-                || (downgrade.visible && downgrade.isMouseOver(mx, my));
+                || (downgrade.visible && downgrade.isMouseOver(mx, my))
+                || (select.visible && select.isMouseOver(mx, my));
     }
 
     public boolean containsPoint(double mx, double my) {
@@ -104,22 +119,26 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         int y = getY();
         int w = width;
 
-        gg.fill(x, y, x + w, y + height, 0xEE303234);
+        gg.fill(x, y, x + w, y + height, 0xFF303234);
         gg.hLine(x, x + w, y, 0xAA5A5A5A);
 
         PlayerAbilities abilities = mc.player.getData(AbilitiesAttachments.PLAYER_ABILITIES.get());
         PlayerSkills skills = mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get());
         int level = abilities.rank(ability.id());
+        int displayLevel = ability.type() == net.revilodev.codex.abilities.AbilityNodeType.SPECIALIZATION
+                ? abilities.rank(ability.id().core())
+                : level;
         boolean canUp = abilities.canUpgrade(ability.id());
         boolean canDown = abilities.canDowngrade(ability.id());
+        boolean specialization = ability.type() == net.revilodev.codex.abilities.AbilityNodeType.SPECIALIZATION;
 
         gg.blit(ability.iconTexture(), x + 3, y + 4, 0, 0, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE, HEADER_ICON_SIZE);
         drawScaledText(gg, ability.title(), x + 17, y + 5, 0xFFFFFF, HEADER_TEXT_SCALE);
-        drawScaledText(gg, "level: " + level + "/" + ability.maxRank(), x + 17, y + 11, 0xD0D0D0, HEADER_TEXT_SCALE);
+        drawScaledText(gg, "level: " + displayLevel + "/" + ability.id().core().maxRank(), x + 17, y + 11, 0xD0D0D0, HEADER_TEXT_SCALE);
 
         List<AbilityId> abilityConflicts = AbilityKeybinds.conflictingAbilities(ability.id());
         List<KeyMapping> keyConflicts = AbilityKeybinds.conflictingNonAbilityMappings(ability.id());
-        String keyText = "Keybind: " + bindLabel(ability.id());
+        String keyText = ability.type() == net.revilodev.codex.abilities.AbilityNodeType.CORE ? "" : ("Keybind: " + bindLabel(ability.id()));
 
         float keyScale = 0.62F;
         int keyWidth = Mth.ceil(mc.font.width(keyText) * keyScale);
@@ -129,15 +148,17 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         keybindTop = keyY;
         keybindRight = keyX + keyWidth;
         keybindBottom = keyY + Mth.ceil(mc.font.lineHeight * keyScale);
-        boolean keyHovered = isOverKeybind(mouseX, mouseY);
+        boolean keyHovered = !keyText.isEmpty() && isOverKeybind(mouseX, mouseY);
 
         int keyColor = 0xD0D0D0;
         if (!abilityConflicts.isEmpty()) keyColor = 0xFF6A6A;
         else if (!keyConflicts.isEmpty()) keyColor = 0xF0D15C;
         else if (keyHovered) keyColor = 0xFFFFFF;
-        drawScaledText(gg, keyText, keyX, keyY, keyColor, keyScale);
+        if (!keyText.isEmpty()) {
+            drawScaledText(gg, keyText, keyX, keyY, keyColor, keyScale);
+        }
 
-        int viewportTop = y + CONTENT_TOP;
+        int viewportTop = y + CONTENT_TOP + contentTopOffset;
         int viewportBottom = y + height - CONTENT_BOTTOM_PADDING;
         int viewportHeight = Math.max(0, viewportBottom - viewportTop);
         contentHeight = measureContentHeight(ability, Math.max(1, level), skills);
@@ -147,8 +168,8 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         gg.enableScissor(x + 2, viewportTop, x + w - 2, viewportBottom);
         int textY = viewportTop - Mth.floor(scrollY);
         textY = drawSmallWrapped(gg, ability.description(), x + 4, textY, w - 8, 0xE2E2E2) + 3;
-        textY = drawSmallWrapped(gg, "Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), Math.max(1, level), skills)), x + 4, textY, w - 8, 0xA6D9FF) + 3;
-        drawSmallWrapped(gg, "Scaling: " + AbilityScaling.summary(ability.id(), Math.max(1, level), skills), x + 4, textY, w - 8, 0xA6D9FF);
+        textY = drawSmallWrapped(gg, "Cooldown: " + formatSeconds(AbilityScaling.cooldownTicks(ability.id(), Math.max(1, displayLevel), skills)), x + 4, textY, w - 8, 0xF0D15C) + 3;
+        drawSmallWrapped(gg, "Scaling: " + AbilityScaling.summary(ability.id(), Math.max(1, displayLevel), skills), x + 4, textY, w - 8, 0xA6D9FF);
         gg.disableScissor();
 
         if (keyHovered) {
@@ -157,8 +178,10 @@ public final class AbilityDetailsPanel extends AbstractWidget {
 
         upgrade.active = canUp;
         downgrade.active = canDown;
-        upgrade.visible = true;
-        downgrade.visible = true;
+        upgrade.visible = !specialization;
+        downgrade.visible = !specialization;
+        select.visible = specialization;
+        select.active = specialization && abilities.unlocked(ability.id());
     }
 
     @Override
@@ -166,12 +189,13 @@ public final class AbilityDetailsPanel extends AbstractWidget {
         if (!visible || !active || button != 0) return false;
         if (upgrade.visible && upgrade.isMouseOver(mouseX, mouseY)) { upgrade.onPress(); return true; }
         if (downgrade.visible && downgrade.isMouseOver(mouseX, mouseY)) { downgrade.onPress(); return true; }
+        if (select.visible && select.isMouseOver(mouseX, mouseY)) { select.onPress(); return true; }
         return false;
     }
 
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaY) {
         if (!visible || !active || ability == null) return false;
-        int viewportTop = getY() + CONTENT_TOP;
+        int viewportTop = getY() + CONTENT_TOP + contentTopOffset;
         int viewportBottom = getY() + height - CONTENT_BOTTOM_PADDING;
         if (mouseX < getX() || mouseX > getX() + width || mouseY < viewportTop || mouseY > viewportBottom) return false;
         int viewportHeight = Math.max(0, viewportBottom - viewportTop);
@@ -276,6 +300,26 @@ public final class AbilityDetailsPanel extends AbstractWidget {
             ResourceLocation tex = !active ? TEX_DOWN_DISABLED : (isMouseOver(mouseX, mouseY) ? TEX_DOWN_HOVER : TEX_DOWN);
             gg.blit(tex, getX(), getY(), 0, 0, width, height, width, height);
             drawScaledText(gg, getMessage().getString(), getX() + 13, getY() + 6, active ? 0xFFFFFF : 0x808080, 0.62F);
+        }
+
+        @Override
+        protected void updateWidgetNarration(NarrationElementOutput narration) {}
+    }
+
+    private final class SelectButton extends AbstractButton {
+        SelectButton(int x, int y) { super(x, y, 58, 18, Component.literal("Select")); }
+
+        @Override
+        public void onPress() {
+            if (!active || ability == null) return;
+            PacketDistributor.sendToServer(new AbilitiesNetwork.AbilityActionPayload(2, ability.id().ordinal()));
+        }
+
+        @Override
+        protected void renderWidget(GuiGraphics gg, int mouseX, int mouseY, float partialTick) {
+            ResourceLocation tex = !active ? TEX_UP_DISABLED : (isMouseOver(mouseX, mouseY) ? TEX_UP_HOVER : TEX_UP);
+            gg.blit(tex, getX(), getY(), 0, 0, width, height, width, height);
+            drawScaledText(gg, getMessage().getString(), getX() + 17, getY() + 6, active ? 0xFFFFFF : 0x808080, 0.62F);
         }
 
         @Override

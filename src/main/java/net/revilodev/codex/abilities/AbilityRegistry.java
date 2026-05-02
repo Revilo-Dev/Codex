@@ -7,21 +7,13 @@ public final class AbilityRegistry {
     private static final EnumMap<AbilityId, AbilityDefinition> DEFINITIONS = new EnumMap<>(AbilityId.class);
     private static final List<AbilityDefinition> ALL;
     private static final List<AbilityId> DISPLAY_ORDER = List.of(
-            AbilityId.LEAP,
-            AbilityId.DASH,
-            AbilityId.LUNGE,
-            AbilityId.HEAL,
-            AbilityId.CLEANSE,
-            AbilityId.WARCRY,
-            AbilityId.CLEAVE,
-            AbilityId.EXECUTION,
-            AbilityId.OVERPOWER,
-            AbilityId.GUARD,
-            AbilityId.SCAVENGER,
-            AbilityId.BLAZE,
-            AbilityId.BLAST,
-            AbilityId.GLACIER,
-            AbilityId.SMITE
+            AbilityId.FIRE, AbilityId.FIRE_BURST, AbilityId.FIRE_NOVA, AbilityId.FIRE_IMPLODE, AbilityId.FIRE_STORM,
+            AbilityId.ICE, AbilityId.ICE_BURST, AbilityId.ICE_NOVA, AbilityId.ICE_PIERCE, AbilityId.ICE_IMPLODE, AbilityId.ICE_GLACIER, AbilityId.ICE_STORM,
+            AbilityId.LIGHTNING, AbilityId.LIGHTNING_STRIKE, AbilityId.LIGHTNING_ZAP, AbilityId.LIGHTNING_NOVA, AbilityId.LIGHTNING_IMPLODE, AbilityId.LIGHTNING_STORM,
+            AbilityId.POISON, AbilityId.POISON_BURST, AbilityId.POISON_NOVA, AbilityId.POISON_IMPLODE,
+            AbilityId.FORCE, AbilityId.FORCE_AEGIS, AbilityId.FORCE_BURST, AbilityId.FORCE_RAMPAGE,
+            AbilityId.MAGIC, AbilityId.MAGIC_HEAL, AbilityId.MAGIC_CLEANSE,
+            AbilityId.WIND, AbilityId.WIND_DASH, AbilityId.WIND_LEAP, AbilityId.WIND_LUNGE
     );
 
     static {

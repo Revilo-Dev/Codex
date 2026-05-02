@@ -1,6 +1,7 @@
 package net.revilodev.codex.abilities;
 
 import net.revilodev.codex.abilities.logic.AbilityLevelIntegrationEvents;
+import net.revilodev.codex.abilities.logic.AbilityPowerEnchantmentEvents;
 import net.revilodev.codex.abilities.logic.AbilitySyncEvents;
 
 public final class AbilitiesEvents {
@@ -14,5 +15,6 @@ public final class AbilitiesEvents {
 
         AbilitySyncEvents.register();
         AbilityLevelIntegrationEvents.register();
+        AbilityPowerEnchantmentEvents.register();
     }
 }

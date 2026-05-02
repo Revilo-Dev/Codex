@@ -61,6 +61,8 @@ public final class SkillsPanelClient {
         NeoForge.EVENT_BUS.addListener(ScreenEvent.Render.Post.class, SkillsPanelClient::onScreenRenderPost);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseScrolled.Pre.class, SkillsPanelClient::onMouseScrolled);
         NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonPressed.Pre.class, SkillsPanelClient::onMousePressed);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseDragged.Pre.class, SkillsPanelClient::onMouseDragged);
+        NeoForge.EVENT_BUS.addListener(ScreenEvent.MouseButtonReleased.Pre.class, SkillsPanelClient::onMouseReleased);
     }
 
     public static void onScreenInit(ScreenEvent.Init.Post event) {
@@ -85,6 +87,7 @@ public final class SkillsPanelClient {
         });
         st.abilityList.setHeaderVisible(false);
         st.abilityList.setShowLocked(true);
+        st.abilityList.setViewportTweaks(-2, 2);
         st.abilityDetails = new AbilityDetailsPanel(0, 0, AbilityListWidget.gridWidth(), PANEL_H / 3);
         st.skillsTab = new PanelTabButton(0, 0, PanelTab.SKILLS, () -> setTab(st, PanelTab.SKILLS));
         st.abilitiesTab = new PanelTabButton(0, 0, PanelTab.ABILITIES, () -> setTab(st, PanelTab.ABILITIES));
@@ -147,6 +150,7 @@ public final class SkillsPanelClient {
             st.abilityDetails.render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
             st.abilityDetails.upgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
             st.abilityDetails.downgradeButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
+            st.abilityDetails.selectButton().render(event.getGuiGraphics(), event.getMouseX(), event.getMouseY(), event.getPartialTick());
         }
         renderPointsBadge(event.getGuiGraphics(), st, inv);
         event.getGuiGraphics().pose().popPose();
@@ -165,9 +169,24 @@ public final class SkillsPanelClient {
             used = st.skillsDetails.mouseScrolled(mx, my, deltaY);
         } else if (st.activeTab == PanelTab.ABILITIES && st.abilityDetails.visible) {
             used = st.abilityDetails.mouseScrolled(mx, my, deltaY);
+            if (!used) used = st.abilityList.mouseScrolled(mx, my, deltaY);
         }
 
         if (used) event.setCanceled(true);
+    }
+
+    public static void onMouseDragged(ScreenEvent.MouseDragged.Pre event) {
+        State st = STATES.get(event.getScreen());
+        if (st == null || !st.open || st.activeTab != PanelTab.ABILITIES) return;
+        if (st.abilityList.mouseDragged(event.getMouseX(), event.getMouseY(), event.getMouseButton(), event.getDragX(), event.getDragY())) {
+            event.setCanceled(true);
+        }
+    }
+
+    public static void onMouseReleased(ScreenEvent.MouseButtonReleased.Pre event) {
+        State st = STATES.get(event.getScreen());
+        if (st == null || !st.open) return;
+        st.abilityList.endDrag();
     }
 
     public static void onMousePressed(ScreenEvent.MouseButtonPressed.Pre event) {
@@ -188,7 +207,7 @@ public final class SkillsPanelClient {
             boolean inNode = st.skillsList.isOnSkillNode(mouseX, mouseY);
             boolean onButton = st.skillsDetails.isOnButtons(mouseX, mouseY);
             boolean inDetails = st.skillsDetails.containsPoint(mouseX, mouseY);
-            if (!inNode && !onButton && !inDetails) {
+            if (!used && !inNode && !onButton && !inDetails) {
                 st.skillsDetails.setSkill(null);
                 st.skillsList.setSelected(null);
             }
@@ -197,7 +216,7 @@ public final class SkillsPanelClient {
             boolean inNode = st.abilityList.isOnAbilityNode(mouseX, mouseY);
             boolean onButton = st.abilityDetails.isOnButtons(mouseX, mouseY);
             boolean inDetails = st.abilityDetails.containsPoint(mouseX, mouseY);
-            if (!inNode && !onButton && !inDetails) {
+            if (!used && !inNode && !onButton && !inDetails) {
                 st.abilityDetails.setAbility(null);
                 st.abilityList.setSelected(null);
             }
@@ -327,8 +346,8 @@ public final class SkillsPanelClient {
         st.bg.setBounds(bgx, bgy, PANEL_W, PANEL_H);
         st.skillsList.setBounds(listX, listY, listW, SkillListWidget.preferredHeight());
         st.skillsDetails.setBounds(detailsX, detailsY, detailsW, detailsH);
-        st.abilityList.setBounds(listX, listY, listW, AbilityListWidget.preferredHeight());
-        st.abilityDetails.setBounds(detailsX, detailsY, detailsW, detailsH);
+        st.abilityList.setBounds(listX - 15, listY, listW, AbilityListWidget.preferredHeight());
+        st.abilityDetails.setBounds(detailsX + 1, detailsY + 3, detailsW, detailsH);
         st.skillsTab.setPosition(bgx - 31, bgy + 6);
         st.abilitiesTab.setPosition(bgx - 31, bgy + 34);
     }
@@ -393,6 +412,8 @@ public final class SkillsPanelClient {
         st.abilityDetails.upgradeButton().active = abilitiesActive;
         st.abilityDetails.downgradeButton().visible = abilitiesActive;
         st.abilityDetails.downgradeButton().active = abilitiesActive;
+        st.abilityDetails.selectButton().visible = abilitiesActive;
+        st.abilityDetails.selectButton().active = abilitiesActive;
     }
 
     private static void renderPointsBadge(GuiGraphics gg, State st, InventoryScreen inv) {
@@ -406,7 +427,7 @@ public final class SkillsPanelClient {
 
         String label = abilitiesTab ? "Ability Points: " + points : "Points: " + points;
         float scale = 0.85F;
-        int x = (abilitiesTab ? st.abilityList.getX() : st.skillsList.getX()) + 1;
+        int x = (abilitiesTab ? st.abilityList.getX() + 15 : st.skillsList.getX()) + 1;
         int y = (abilitiesTab ? st.abilityList.getY() : st.skillsList.getY()) + 4;
         int color = abilitiesTab ? 0xC78CFF : 0x6AB2FF;
         gg.pose().pushPose();

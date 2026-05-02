@@ -202,6 +202,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
         if (level <= 0) {
             return def.description();
         }
+        int luckLevel = mc.player == null ? 0 : mc.player.getData(SkillsAttachments.PLAYER_SKILLS.get()).level(net.revilodev.codex.skills.SkillId.LUCK);
         return switch (def.id()) {
             case STRENGTH -> "+" + fmt(SkillBalance.strengthDamage(level)) + " damage";
             case POWER -> "+" + fmt(SkillBalance.powerDamage(level)) + " bow damage";
@@ -215,7 +216,7 @@ public final class SkillDetailsPanel extends AbstractWidget {
             case LEAPING -> "+" + fmt(SkillBalance.leapingBonus(level) * 100.0D) + "% jump height";
             case VITALITY -> "+" + fmt(SkillBalance.vitalityHearts(level)) + " hearts";
             case REGENERATION -> "+" + fmt(SkillBalance.regenHeartsPerSecond(level) * 100.0D) + "% regen";
-            case HEALTH_BOOST -> "+" + fmt(SkillBalance.lifeLeach(level) * 100.0D)
+            case HEALTH_BOOST -> "+" + fmt(SkillBalance.lifeLeach(luckLevel) * 100.0D)
                     + "% chance to steal "
                     + fmt(SkillBalance.lifeLeachAmount() * 100.0D)
                     + "% max health";

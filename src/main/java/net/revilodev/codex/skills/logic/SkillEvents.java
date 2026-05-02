@@ -101,7 +101,8 @@ public final class SkillEvents {
             }
             int lifeLeach = data.level(SkillId.HEALTH_BOOST);
             if (lifeLeach > 0 && amt > 0.0F) {
-                double leachChance = SkillBalance.lifeLeach(lifeLeach);
+                int luckLevel = data.level(SkillId.LUCK);
+                double leachChance = SkillBalance.lifeLeach(luckLevel);
                 double leachAmount = SkillBalance.lifeLeachAmount();
                 if (attacker.getRandom().nextDouble() < leachChance) {
                     LivingEntity target = event.getEntity();
